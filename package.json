@@ -1,0 +1,17 @@
+{
+	"name": "home",
+	"version": "1.0.0",
+	"description": "",
+	"bugs": {
+		"url": "https://github.com/dluigirafael/home/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/dluigirafael/home.git"
+	},
+	"type": "module",
+	"scripts": {
+		"start": "node server.js",
+		"dev": "node --env-file=.env  --watch server.js"
+	}
+}
