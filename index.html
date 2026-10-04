@@ -1,245 +1,222 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="robots" content="noindex, nofollow, noai, noimageai">
-<title>Now Playing</title>
-<style>
-  :root {
-    color-scheme: dark;
-    --bg: #0b0d10;
-    --card: #14181d;
-    --border: #222a33;
-    --text: #e6e8eb;
-    --muted: #7a8794;
-    --dim: #5f6b77;
-    --accent: #4ea1ff;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    min-height: 100vh;
-    display: grid;
-    place-items: center;
-    background: var(--bg);
-    color: var(--text);
-    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
-  }
-  .card {
-    width: min(92vw, 620px);
-    padding: 2rem;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-  }
-  .h {
-    margin: 0 0 1.25rem;
-    font-size: .7rem;
-    letter-spacing: .25em;
-    text-transform: uppercase;
-    color: var(--muted);
-    font-weight: 500;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .status {
-    display: inline-flex;
-    align-items: center;
-    gap: .4rem;
-    font-size: .65rem;
-    letter-spacing: .15em;
-    color: var(--dim);
-  }
-  .dot {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--dim);
-  }
-  .dot.playing { background: #3ddc84; box-shadow: 0 0 8px #3ddc8466; }
-  .dot.paused { background: #ffb84d; }
-  .title {
-    font-size: 1.15rem;
-    font-weight: 600;
-    line-height: 1.35;
-    margin-bottom: .25rem;
-    word-break: break-word;
-  }
-  .artist {
-    color: var(--muted);
-    font-size: .9rem;
-    margin-bottom: 1.25rem;
-    word-break: break-word;
-  }
-  .progress {
-    display: flex;
-    align-items: center;
-    gap: .75rem;
-    font-size: .75rem;
-    color: var(--dim);
-    font-variant-numeric: tabular-nums;
-  }
-  .bar {
-    flex: 1;
-    height: 4px;
-    background: #1d242c;
-    border-radius: 999px;
-    overflow: hidden;
-  }
-  .bar > span {
-    display: block;
-    height: 100%;
-    background: var(--accent);
-    width: 0;
-    transition: width .5s linear;
-  }
-  .empty { color: var(--dim); font-style: italic; }
-  .queue {
-    margin-top: 1.75rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--border);
-  }
-  .queue h2 {
-    margin: 0 0 .85rem;
-    font-size: .7rem;
-    letter-spacing: .25em;
-    text-transform: uppercase;
-    color: var(--muted);
-    font-weight: 500;
-  }
-  .queue ol {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    counter-reset: q;
-  }
-  .queue li {
-    counter-increment: q;
-    display: flex;
-    gap: .85rem;
-    padding: .5rem 0;
-    border-bottom: 1px solid #1a1f26;
-    font-size: .9rem;
-  }
-  .queue li:last-child { border-bottom: 0; }
-  .queue li::before {
-    content: counter(q);
-    color: var(--dim);
-    font-size: .75rem;
-    min-width: 1.25rem;
-    padding-top: .15rem;
-    font-variant-numeric: tabular-nums;
-  }
-  .q-meta { min-width: 0; flex: 1; }
-  .q-title {
-    color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .q-artist {
-    color: var(--muted);
-    font-size: .8rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .q-dur {
-    color: var(--dim);
-    font-size: .75rem;
-    font-variant-numeric: tabular-nums;
-    padding-top: .15rem;
-  }
-</style>
-</head>
-<body>
-  <div class="card">
-    <div class="h">
-      <span>Now Playing</span>
-      <span class="status"><span class="dot" id="dot"></span><span id="statusText">—</span></span>
-    </div>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex, nofollow, noai, noimageai" />
+		<title>Now Playing</title>
+		<link rel="stylesheet" href="/styles.css" />
+	</head>
+	<body>
+		<div class="card">
+			<div class="status">
+				<span class="dot" id="dot"></span>
+				<span id="statusText">—</span>
+			</div>
 
-    <div id="now"><span class="empty">Loading…</span></div>
+			<section class="hero">
+				<div id="now"><span class="empty">Loading…</span></div>
+			</section>
 
-    <div id="queue"></div>
-  </div>
+			<section id="queue"></section>
 
-<script>
-const $now = document.getElementById('now');
-const $queue = document.getElementById('queue');
-const $dot = document.getElementById('dot');
-const $statusText = document.getElementById('statusText');
+			<footer class="meta">
+				<div class="cell">
+					<span class="k">TS</span>
+					<span class="v" id="s-ts">—</span>
+				</div>
+				<div class="cell">
+					<span class="k">Clients</span>
+					<span class="v" id="s-clients">—</span>
+				</div>
+				<div class="cell">
+					<span class="k">CPU</span>
+					<span class="v" id="s-cpu">—</span>
+				</div>
+				<div class="cell">
+					<span class="k">RAM</span>
+					<span class="v" id="s-ram">—</span>
+				</div>
+				<div class="cell">
+					<span class="k">Disk</span>
+					<span class="v" id="s-disk">—</span>
+				</div>
+				<div class="cell">
+					<span class="k">Temp</span>
+					<span class="v" id="s-temp">—</span>
+				</div>
+				<div class="cell">
+					<span class="k">Uptime</span>
+					<span class="v" id="s-uptime">—</span>
+				</div>
+				<div class="cell">
+					<span class="k">Time</span>
+					<span class="v" id="s-clock">—</span>
+				</div>
+			</footer>
+		</div>
 
-const esc = s => String(s).replace(/[&<>"']/g, c =>
-  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+		<script>
+			const $now = document.getElementById("now");
+			const $queue = document.getElementById("queue");
+			const $dot = document.getElementById("dot");
+			const $statusText = document.getElementById("statusText");
 
-function fmt(sec) {
-  if (sec == null || isNaN(sec)) return '0:00';
-  sec = Math.max(0, Math.floor(sec));
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return m + ':' + String(s).padStart(2, '0');
-}
+			const esc = (s) =>
+				String(s).replace(
+					/[&<>"']/g,
+					(c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+				);
 
-function render(d) {
-  const np = d && d.nowPlaying;
-  const prog = (d && d.progress) || {};
-  const status = (d && d.status) || 'idle';
-  const upcoming = (d && d.upcoming) || [];
+			const fmt = (sec) => {
+				sec = Math.max(0, Math.floor(sec || 0));
+				return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+			};
 
-  $dot.className = 'dot ' + (status === 'playing' ? 'playing' : status === 'paused' ? 'paused' : '');
-  $statusText.textContent = status;
+			const fmtUptime = (s) => {
+				s = Math.floor(s || 0);
+				const d = Math.floor(s / 86400);
+				const h = Math.floor((s % 86400) / 3600);
+				const m = Math.floor((s % 3600) / 60);
+				return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`;
+			};
 
-  if (!np) {
-    $now.innerHTML = '<span class="empty">Nothing playing</span>';
-  } else {
-    const pos = prog.position || 0;
-    const dur = prog.duration || np.duration || 0;
-    const pct = dur > 0 ? Math.min(100, (pos / dur) * 100) : 0;
+			const POLL_MS = 5000;
+			const STATS_MS = 10000;
+			const TICK_MS = 1000;
 
-    $now.innerHTML =
-      '<div class="title">' + esc(np.title || 'Unknown') + '</div>' +
-      (np.artist ? '<div class="artist">' + esc(np.artist) + '</div>' : '') +
-      '<div class="progress">' +
-        '<span>' + fmt(pos) + '</span>' +
-        '<div class="bar"><span style="width:' + pct + '%"></span></div>' +
-        '<span>' + fmt(dur) + '</span>' +
-      '</div>';
-  }
+			let pos = 0;
+			let dur = 0;
+			let trackId = null;
+			let playing = false;
 
-  if (upcoming.length) {
-    const total = d.queueLength || upcoming.length;
-    $queue.innerHTML =
-      '<div class="queue"><h2>Up Next · ' + total + '</h2><ol>' +
-      upcoming.slice(0, 5).map(i =>
-        '<li>' +
-          '<div class="q-meta">' +
-            '<div class="q-title">' + esc(i.title || 'Unknown') + '</div>' +
-            (i.artist ? '<div class="q-artist">' + esc(i.artist) + '</div>' : '') +
-          '</div>' +
-          (i.duration ? '<div class="q-dur">' + fmt(i.duration) + '</div>' : '') +
-        '</li>'
-      ).join('') +
-      '</ol></div>';
-  } else {
-    $queue.innerHTML = '';
-  }
-}
+			const pct = () => (dur > 0 ? Math.min(100, (pos / dur) * 100) : 0);
 
-async function tick() {
-  try {
-    const r = await fetch('/data');
-    if (!r.ok) throw 0;
-    render(await r.json());
-  } catch {
-    $now.innerHTML = '<span class="empty">Unavailable</span>';
-    $queue.innerHTML = '';
-    $dot.className = 'dot';
-    $statusText.textContent = '—';
-  }
-}
+			function renderNow() {
+				const np = window.__np;
+				if (!np) {
+					$now.innerHTML = '<span class="empty">Nothing playing</span>';
+					return;
+				}
+				if (!document.getElementById("pos")) {
+					$now.innerHTML = `
+      <div class="title">${esc(np.title || "Unknown")}</div>
+      ${np.artist ? `<div class="artist">${esc(np.artist)}</div>` : ""}
+      <div class="progress">
+        <span class="t" id="pos"></span>
+        <div class="bar"><span id="bar"></span></div>
+        <span class="t" id="dur">${fmt(dur)}</span>
+      </div>`;
+				}
+				document.getElementById("pos").textContent = fmt(pos);
+				document.getElementById("bar").style.width = `${pct()}%`;
+			}
 
-tick();
-setInterval(tick, 3000);
-</script>
-</body>
+			function renderQueue(upcoming, total) {
+				if (!upcoming?.length) {
+					$queue.innerHTML = "";
+					return;
+				}
+				$queue.innerHTML = `
+    <div class="queue">
+      <h2><span>Up Next</span><span class="count">${total || upcoming.length}</span></h2>
+      <ol>
+        ${upcoming
+					.slice(0, 5)
+					.map(
+						(i) => `
+          <li>
+            <div class="q-meta">
+              <div class="q-title">${esc(i.title || "Unknown")}</div>
+              ${i.artist ? `<div class="q-artist">${esc(i.artist)}</div>` : ""}
+            </div>
+            ${i.duration ? `<div class="q-dur">${fmt(i.duration)}</div>` : ""}
+          </li>`,
+					)
+					.join("")}
+      </ol>
+    </div>`;
+			}
+
+			function tick() {
+				if (!playing || !window.__np) return;
+				pos = Math.min(pos + 1, dur);
+				document.getElementById("pos").textContent = fmt(pos);
+				document.getElementById("bar").style.width = `${pct()}%`;
+			}
+
+			async function poll() {
+				try {
+					const r = await fetch("/data", { cache: "no-store" });
+					if (!r.ok) throw 0;
+					const d = await r.json();
+					const np = d.nowPlaying;
+					const id = np ? `${np.title}|${np.artist || ""}` : null;
+
+					if (id !== trackId) {
+						trackId = id;
+						pos = d.progress?.position ?? 0;
+						dur = d.progress?.duration ?? np?.duration ?? 0;
+						window.__np = np;
+						$now.innerHTML = "";
+						renderNow();
+						renderQueue(d.upcoming, d.queueLength);
+					} else {
+						// 2s tolerance absorbs setInterval drift and server jitter without visibly snapping the bar
+						const serverPos = d.progress?.position ?? 0;
+						if (Math.abs(serverPos - pos) > 2) pos = serverPos;
+						dur = d.progress?.duration ?? np?.duration ?? dur;
+					}
+
+					playing = d.status === "playing";
+					$dot.className = `dot ${playing ? "playing" : d.status === "paused" ? "paused" : ""}`;
+					$statusText.textContent = d.status || "idle";
+				} catch {
+					$now.innerHTML = '<span class="empty">Unavailable</span>';
+					$queue.innerHTML = "";
+					$dot.className = "dot";
+					$statusText.textContent = "—";
+					playing = false;
+				}
+			}
+
+			async function pollStats() {
+				try {
+					const r = await fetch("/stats", { cache: "no-store" });
+					if (!r.ok) throw 0;
+					const d = await r.json();
+					const el = (id) => document.getElementById(id);
+
+					const tsEl = el("s-ts");
+					tsEl.textContent = d.ts?.online ? "online" : "offline";
+					tsEl.className = `v ${d.ts?.online ? "ok" : "bad"}`;
+
+					el("s-clients").textContent =
+						d.ts?.clients != null ? `${d.ts.clients}${d.ts.maxClients ? "/" + d.ts.maxClients : ""}` : "—";
+					el("s-cpu").textContent = d.cpu ? `${d.cpu.percent.toFixed(0)}%` : "—";
+					el("s-ram").textContent = d.mem ? `${d.mem.percent.toFixed(0)}%` : "—";
+					el("s-disk").textContent = d.disk ? `${d.disk.percent.toFixed(0)}%` : "—";
+					el("s-temp").textContent = d.temps?.lengthgb
+						? d.temps.map((t) => `${t.celsius.toFixed(0)}°`).join("/")
+						: "—";
+					el("s-uptime").textContent = d.uptime ? fmtUptime(d.uptime.host) : "—";
+					el("s-clock").textContent = d.clock
+						? new Date(d.clock.iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+						: "—";
+				} catch {
+					["s-ts", "s-clients", "s-cpu", "s-ram", "s-disk", "s-temp", "s-uptime", "s-clock"].forEach((id) => {
+						const e = document.getElementById(id);
+						e.textContent = "—";
+						e.className = "v";
+					});
+				}
+			}
+
+			poll();
+			pollStats();
+			setInterval(tick, TICK_MS);
+			setInterval(poll, POLL_MS);
+			setInterval(pollStats, STATS_MS);
+		</script>
+	</body>
 </html>
