@@ -30,22 +30,25 @@
 
     <section id="queue"></section>
 
-    <footer class="meta">
+    <section class="resources">
       <div class="cell">
         <span class="k">CPU</span>
         <span class="v" id="s-cpu">—</span>
-        <span class="spark"><i id="s-cpu-bar"></i></span>
+        <span class="spark" id="s-cpu-spark"></span>
       </div>
       <div class="cell">
         <span class="k">RAM</span>
         <span class="v" id="s-ram">—</span>
-        <span class="spark"><i id="s-ram-bar"></i></span>
+        <span class="spark" id="s-ram-spark"></span>
       </div>
       <div class="cell">
         <span class="k">Disk</span>
         <span class="v" id="s-disk">—</span>
-        <span class="spark"><i id="s-disk-bar"></i></span>
+        <span class="spark" id="s-disk-spark"></span>
       </div>
+    </section>
+
+    <section class="meta">
       <div class="cell">
         <span class="k">Temp</span>
         <span class="v" id="s-temp">—</span>
@@ -58,7 +61,14 @@
         <span class="k">Time</span>
         <span class="v" id="s-clock">—</span>
       </div>
-    </footer>
+    </section>
+
+    <section class="health-wrap">
+      <span class="health-label">Services</span>
+      <div class="health" id="health"></div>
+    </section>
+
+    <footer class="build" id="build"></footer>
 
   </div>
 

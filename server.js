@@ -3,10 +3,22 @@ import os from "node:os";
 import { readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-const execAsync = promisify(exec);
+const DOCKER_PROXY = process.env.DOCKER_PROXY || 'http://docker-socket-proxy:2375';
+
+const HEALTH_EXCLUDE = new Set(
+  (process.env.HEALTH_EXCLUDE || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+);
+
+const HISTORY_SIZE = 60;
+const history = { cpu: [], ram: [], disk: [] };
+
+const execFileAsync = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const TOKEN = process.env.WIDGET_TOKEN;
@@ -81,9 +93,46 @@ async function tsInfo() {
 		return { online: false, clients: null, maxClients: null };
 	}
 }
+function dockerRequest(path, timeout = 3000) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(DOCKER_PROXY);
+    const req = http.request(
+      { hostname: u.hostname, port: u.port, path, method: 'GET' },
+      (res) => {
+        let data = '';
+        res.on('data', (c) => (data += c));
+        res.on('end', () => resolve({ status: res.statusCode, body: data }));
+      }
+    );
+    req.on('error', reject);
+    req.setTimeout(timeout, () => req.destroy(new Error('timeout')));
+    req.end();
+  });
+}
+
+async function containersInfo() {
+  try {
+    const r = await dockerRequest('/containers/json?all=true');
+    if (r.status !== 200) return [];
+    const list = JSON.parse(r.body);
+    return list
+      .map((c) => {
+        const name = (c.Names?.[0] || '').replace(/^\//, '');
+        return {
+          name,
+          image: c.Image,
+          state: c.State,
+          status: c.Status,
+        };
+      })
+      .filter((c) => c.name && !HEALTH_EXCLUDE.has(c.name));
+  } catch {
+    return [];
+  }
+}
 async function diskInfo() {
 	try {
-		const { stdout } = await execAsync("df -k /");
+		const { stdout } = await execFileAsync('df', ['-k', '/']);
 		const line = stdout.trim().split("\n")[1];
 		const [, blocks, used, avail] = line.split(/\s+/);
 		const total = Number(blocks) * 1024;
@@ -218,17 +267,44 @@ async function tsHumans() {
   }
 }
 async function gatherStats() {
-  const [ts, disk, temps, humans] = await Promise.all([
-    tsInfo(), diskInfo(), tempInfo(), tsHumans(),
+  const [ts, disk, temps, humans, containers] = await Promise.all([
+    tsInfo(),
+    diskInfo(),
+    tempInfo(),
+    tsHumans(),
+    containersInfo(),
   ]);
+
+  const cpu = cpuInfo();
+  const mem = memInfo();
+
+  const push = (arr, v) => {
+    arr.push(Number.isFinite(v) ? Number(v.toFixed(1)) : 0);
+    if (arr.length > HISTORY_SIZE) arr.shift();
+  };
+  push(history.cpu, cpu.percent);
+  push(history.ram, mem.percent);
+  push(history.disk, disk?.percent ?? 0);
+
   return {
     ts: { ...ts, clients: humans ?? ts.clients },
-    cpu: cpuInfo(),
-    mem: memInfo(),
+    cpu,
+    mem,
     disk,
     temps,
     uptime: uptimeInfo(),
     clock: clockInfo(),
+    containers,
+    history: {
+      cpu: [...history.cpu],
+      ram: [...history.ram],
+      disk: [...history.disk],
+    },
+    build: {
+      sha: process.env.GIT_SHA || null,
+      date: process.env.BUILD_DATE || null,
+      runUrl: process.env.GH_RUN_URL || null,
+    },
   };
 }
 const server = http.createServer(async (req, res) => {

@@ -118,18 +118,23 @@ async function poll() {
   }
 }
 
-function setBar(id, pct) {
-  const bar = document.getElementById(`${id}-bar`);
-  const cell = bar?.closest('.cell');
-  if (!bar || !cell) return;
-  if (pct == null) {
-    bar.style.width = '0%';
-    cell.classList.remove('warn', 'hot');
-    return;
-  }
-  bar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
-  cell.classList.toggle('warn', pct >= 60 && pct < 85);
-  cell.classList.toggle('hot', pct >= 85);
+function sparkline(values, color = '#8a8d94') {
+  if (!values || values.length < 2) return '';
+  const w = 100, h = 16;
+  const max = Math.max(...values, 1);
+  const step = w / (values.length - 1);
+  const points = values
+    .map((v, i) => `${(i * step).toFixed(1)},${(h - (v / max) * h).toFixed(1)}`)
+    .join(' ');
+  return `<svg class="spark-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+  </svg>`;
+}
+
+function setSparkline(id, values) {
+  const el = document.getElementById(`${id}-spark`);
+  if (!el) return;
+  el.innerHTML = sparkline(values);
 }
 
 function setCellState(id, value, warnAt, hotAt) {
@@ -139,6 +144,41 @@ function setCellState(id, value, warnAt, hotAt) {
   cell.classList.toggle('hot', value != null && value >= hotAt);
 }
 
+function renderHealth(containers) {
+  const el = document.getElementById('health');
+  if (!el) return;
+  if (!containers?.length) {
+    el.innerHTML = '<span class="h-empty">no data</span>';
+    return;
+  }
+  const sorted = [...containers].sort((a, b) => a.name.localeCompare(b.name));
+  el.innerHTML = sorted
+    .map((c) => {
+      const ok = c.state === 'running';
+      return `<span class="h-item">
+        <span class="h-dot ${ok ? 'ok' : 'bad'}"></span>
+        <span class="h-name">${esc(c.name)}</span>
+      </span>`;
+    })
+    .join('');
+}
+
+function renderBuild(build) {
+  const el = document.getElementById('build');
+  if (!el || !build) return;
+  const parts = [];
+  if (build.sha) {
+    const short = build.sha.slice(0, 7);
+    parts.push(build.runUrl
+      ? `<a href="${esc(build.runUrl)}" target="_blank" rel="noopener">${esc(short)}</a>`
+      : esc(short));
+  }
+  if (build.date) {
+    const d = new Date(build.date);
+    if (!isNaN(d)) parts.push(d.toISOString().slice(0, 16).replace('T', ' ') + 'Z');
+  }
+  el.innerHTML = parts.join(' · ') || '';
+}
 async function pollStats() {
   const el = (id) => document.getElementById(id);
   try {
@@ -175,10 +215,12 @@ async function pollStats() {
         })
       : '—';
 
-    setBar('s-cpu', cpuPct);
-    setBar('s-ram', ramPct);
-    setBar('s-disk', diskPct);
+    setSparkline('s-cpu', d.history?.cpu);
+    setSparkline('s-ram', d.history?.ram);
+    setSparkline('s-disk', d.history?.disk);
     setCellState('s-temp', tempC, 65, 80);
+    renderHealth(d.containers);
+    renderBuild(d.build);
   } catch {
     el('s-ts-text').textContent = 'offline';
     el('s-ts-text').className = 'server-status bad';
@@ -186,8 +228,9 @@ async function pollStats() {
     ['s-cpu', 's-ram', 's-disk', 's-temp', 's-uptime', 's-clock'].forEach((id) => {
       el(id).textContent = '—';
     });
-    ['s-cpu', 's-ram', 's-disk'].forEach((id) => setBar(id, null));
+    ['s-cpu', 's-ram', 's-disk'].forEach((id) => setSparkline(id, null));
     setCellState('s-temp', null, 65, 80);
+    renderHealth([]);
   }
 }
 

@@ -8,6 +8,8 @@ on:
       - ".gitignore"
       - "LICENSE"
   workflow_dispatch:
+  schedule:
+    - cron: '0 4 1 * *' # keep node up to date
 
 jobs:
   build:
@@ -34,6 +36,10 @@ jobs:
         with:
           context: .
           push: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            GH_RUN_URL=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
           tags: |
             ghcr.io/${{ steps.repo.outputs.name }}:latest
             ghcr.io/${{ steps.repo.outputs.name }}:${{ github.sha }}
