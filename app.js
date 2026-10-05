@@ -49,23 +49,12 @@ function renderNow() {
   document.getElementById('bar').style.width = `${pct()}%`;
 }
 
-function renderQueue(upcoming, total, nowPlaying) {
+function renderQueue(upcoming, total) {
   const listCount = upcoming?.length || 0;
   const queueTotal = Number(total) || listCount;
 
   if (listCount === 0 && queueTotal === 0) {
     $queue.innerHTML = '';
-    return;
-  }
-
-  const isPlaylist = nowPlaying?.source === 'youtube' && queueTotal > listCount + 2;
-
-  if (isPlaylist) {
-    $queue.innerHTML = `
-      <div class="queue">
-        <h2><span>Playing playlist</span><span class="count">${queueTotal} tracks</span></h2>
-        <div class="q-playlist">Now playing from a YouTube playlist</div>
-      </div>`;
     return;
   }
 
@@ -89,7 +78,6 @@ function renderQueue(upcoming, total, nowPlaying) {
       </ol>
     </div>`;
 }
-
 function tick() {
   if (!playing || !window.__np) return;
   pos = Math.min(pos + 1, dur);
@@ -112,7 +100,7 @@ async function poll() {
       window.__np = np;
       $now.innerHTML = '';
       renderNow();
-      renderQueue(d.upcoming, d.queueLength, np);
+      renderQueue(d.upcoming, d.queueLength,);
     } else {
       // 2s tolerance absorbs setInterval drift and server jitter without visibly snapping the bar
       const serverPos = d.progress?.position ?? 0;
