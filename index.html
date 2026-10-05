@@ -196,7 +196,7 @@
 					el("s-cpu").textContent = d.cpu ? `${d.cpu.percent.toFixed(0)}%` : "—";
 					el("s-ram").textContent = d.mem ? `${d.mem.percent.toFixed(0)}%` : "—";
 					el("s-disk").textContent = d.disk ? `${d.disk.percent.toFixed(0)}%` : "—";
-					el("s-temp").textContent = d.temps?.lengthgb
+					el("s-temp").textContent = d.temps?.length
 						? d.temps.map((t) => `${t.celsius.toFixed(0)}°`).join("/")
 						: "—";
 					el("s-uptime").textContent = d.uptime ? fmtUptime(d.uptime.host) : "—";

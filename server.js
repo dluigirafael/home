@@ -59,25 +59,23 @@ async function tsInfo() {
 	if (!TS_API_KEY) return { online: false, clients: null, maxClients: null };
 	try {
 		const url = `http://${TS_HOST}:${TS_QUERY_PORT}/1/serverinfo`;
-		const r = await httpRequest(url, {
-			headers: { "x-api-key": TS_API_KEY },
-		});
+		const r = await httpRequest(url, { headers: { "x-api-key": TS_API_KEY } });
 		if (r.status < 200 || r.status >= 300) {
 			return { online: false, clients: null, maxClients: null };
 		}
 		const parsed = JSON.parse(r.body);
 		const d = Array.isArray(parsed.body) ? parsed.body[0] : parsed.body;
+		const online = Number(d.virtualserver_clientsonline ?? 0);
+		const query = Number(d.virtualserver_queryclientsonline ?? 0);
 		return {
 			online: true,
-			clients: Number(d.virtualserver_clientsonline ?? 0) || null,
+			clients: Math.max(0, online - query) || null,
 			maxClients: Number(d.virtualserver_maxclients ?? 0) || null,
-			name: d.virtualserver_name || null,
 		};
 	} catch {
 		return { online: false, clients: null, maxClients: null };
 	}
 }
-
 async function diskInfo() {
 	try {
 		const { stdout } = await execAsync("df -k /");
@@ -175,18 +173,19 @@ function clockInfo() {
 }
 
 async function gatherStats() {
-	const [ts, disk, temps] = await Promise.all([tsInfo(), diskInfo(), tempInfo()]);
-	return {
-		ts,
-		cpu: cpuInfo(),
-		mem: memInfo(),
-		disk,
-		temps,
-		uptime: uptimeInfo(),
-		clock: clockInfo(),
-	};
+  const [ts, disk, temps, humans] = await Promise.all([
+    tsInfo(), diskInfo(), tempInfo(), tsHumans(),
+  ]);
+  return {
+    ts: { ...ts, clients: humans ?? ts.clients },
+    cpu: cpuInfo(),
+    mem: memInfo(),
+    disk,
+    temps,
+    uptime: uptimeInfo(),
+    clock: clockInfo(),
+  };
 }
-
 const server = http.createServer(async (req, res) => {
 	if (req.method !== "GET") {
 		res.writeHead(405).end();
