@@ -15,7 +15,6 @@ if (!TOKEN) {
 	process.exit(1);
 }
 
-
 const PORT = process.env.PORT || 3000;
 const MANAGER = process.env.MANAGER_URL || "http://ts6-backend:3001";
 
@@ -40,43 +39,43 @@ const json = (res, code, body) => {
 	res.end(typeof body === "string" ? body : JSON.stringify(body));
 };
 
-function httpRequest(url, { method = "GET", headers = {}, body = null, timeout = 3000 } = {}) {
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const req = http.request(
-      { hostname: u.hostname, port: u.port, path: u.pathname + u.search, method, headers },
-      (res) => {
-        let data = "";
-        res.on("data", (c) => (data += c));
-        res.on("end", () => resolve({ status: res.statusCode, body: data }));
-      }
-    );
-    req.on("error", reject);
-    req.setTimeout(timeout, () => { req.destroy(new Error("timeout")); });
-    if (body) req.write(body);
-    req.end();
-  });
+function httpRequest(url, { method = "GET", headers = {}, timeout = 3000 } = {}) {
+	return new Promise((resolve, reject) => {
+		const u = new URL(url);
+		const req = http.request(
+			{ hostname: u.hostname, port: u.port, path: u.pathname + u.search, method, headers },
+			(res) => {
+				let data = "";
+				res.on("data", (c) => (data += c));
+				res.on("end", () => resolve({ status: res.statusCode, body: data }));
+			},
+		);
+		req.on("error", reject);
+		req.setTimeout(timeout, () => req.destroy(new Error("timeout")));
+		req.end();
+	});
 }
-
 async function tsInfo() {
-  if (!TS_API_KEY) return { online: false, clients: null, maxClients: null };
-  try {
-    const r = await httpRequest(`http://${TS_HOST}:${TS_QUERY_PORT}/`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-api-key": TS_API_KEY },
-      body: JSON.stringify({ cmd: "serverinfo" }),
-    });
-    if (r.status < 200 || r.status >= 300) return { online: false, clients: null, maxClients: null };
-    const d = JSON.parse(r.body);
-    return {
-      online: true,
-      clients: Number(d.virtualserver_clientsonline ?? d.clientsonline ?? 0) || null,
-      maxClients: Number(d.virtualserver_maxclients ?? d.maxclients ?? 0) || null,
-      name: d.virtualserver_name || null,
-    };
-  } catch {
-    return { online: false, clients: null, maxClients: null };
-  }
+	if (!TS_API_KEY) return { online: false, clients: null, maxClients: null };
+	try {
+		const url = `http://${TS_HOST}:${TS_QUERY_PORT}/1/serverinfo`;
+		const r = await httpRequest(url, {
+			headers: { "x-api-key": TS_API_KEY },
+		});
+		if (r.status < 200 || r.status >= 300) {
+			return { online: false, clients: null, maxClients: null };
+		}
+		const parsed = JSON.parse(r.body);
+		const d = Array.isArray(parsed.body) ? parsed.body[0] : parsed.body;
+		return {
+			online: true,
+			clients: Number(d.virtualserver_clientsonline ?? 0) || null,
+			maxClients: Number(d.virtualserver_maxclients ?? 0) || null,
+			name: d.virtualserver_name || null,
+		};
+	} catch {
+		return { online: false, clients: null, maxClients: null };
+	}
 }
 
 async function diskInfo() {
