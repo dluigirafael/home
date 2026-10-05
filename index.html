@@ -9,10 +9,19 @@
 	</head>
 	<body>
 		<div class="card">
-			<div class="status">
-				<span class="dot" id="dot"></span>
-				<span id="statusText">—</span>
-			</div>
+			<header class="server">
+				<div class="server-side">
+					<span class="server-label">TeamSpeak</span>
+					<span class="server-status-row">
+						<span class="dot" id="dot"></span>
+						<span class="server-status" id="s-ts-text">—</span>
+					</span>
+				</div>
+				<div class="server-side server-side-right">
+					<span class="server-num" id="s-clients">—</span>
+					<span class="server-label">online</span>
+				</div>
+			</header>
 
 			<section class="hero">
 				<div id="now"><span class="empty">Loading…</span></div>
@@ -22,24 +31,19 @@
 
 			<footer class="meta">
 				<div class="cell">
-					<span class="k">TS</span>
-					<span class="v" id="s-ts">—</span>
-				</div>
-				<div class="cell">
-					<span class="k">Clients</span>
-					<span class="v" id="s-clients">—</span>
-				</div>
-				<div class="cell">
 					<span class="k">CPU</span>
 					<span class="v" id="s-cpu">—</span>
+					<span class="spark"><i id="s-cpu-bar"></i></span>
 				</div>
 				<div class="cell">
 					<span class="k">RAM</span>
 					<span class="v" id="s-ram">—</span>
+					<span class="spark"><i id="s-ram-bar"></i></span>
 				</div>
 				<div class="cell">
 					<span class="k">Disk</span>
 					<span class="v" id="s-disk">—</span>
+					<span class="spark"><i id="s-disk-bar"></i></span>
 				</div>
 				<div class="cell">
 					<span class="k">Temp</span>
@@ -169,17 +173,32 @@
 					}
 
 					playing = d.status === "playing";
-					$dot.className = `dot ${playing ? "playing" : d.status === "paused" ? "paused" : ""}`;
-					$statusText.textContent = d.status || "idle";
 				} catch {
 					$now.innerHTML = '<span class="empty">Unavailable</span>';
 					$queue.innerHTML = "";
-					$dot.className = "dot";
-					$statusText.textContent = "—";
 					playing = false;
 				}
 			}
+			function setBar(id, pct) {
+				const bar = document.getElementById(id + "-bar");
+				const cell = bar?.closest(".cell");
+				if (!bar || !cell) return;
+				if (pct == null) {
+					bar.style.width = "0%";
+					cell.classList.remove("warn", "hot");
+					return;
+				}
+				bar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+				cell.classList.toggle("warn", pct >= 60 && pct < 85);
+				cell.classList.toggle("hot", pct >= 85);
+			}
 
+			function setCellState(id, value, warnAt, hotAt) {
+				const cell = document.getElementById(id)?.closest(".cell");
+				if (!cell) return;
+				cell.classList.toggle("warn", value != null && value >= warnAt && value < hotAt);
+				cell.classList.toggle("hot", value != null && value >= hotAt);
+			}
 			async function pollStats() {
 				try {
 					const r = await fetch("/stats", { cache: "no-store" });
@@ -187,27 +206,43 @@
 					const d = await r.json();
 					const el = (id) => document.getElementById(id);
 
-					const tsEl = el("s-ts");
-					tsEl.textContent = d.ts?.online ? "online" : "offline";
-					tsEl.className = `v ${d.ts?.online ? "ok" : "bad"}`;
+					const online = !!d.ts?.online;
+					el("s-ts-text").textContent = online ? "online" : "offline";
+					el("s-ts-text").className = `server-status ${online ? "ok" : "bad"}`;
+					$dot.className = `dot ${online ? "playing" : ""}`;
 
 					el("s-clients").textContent =
 						d.ts?.clients != null ? `${d.ts.clients}${d.ts.maxClients ? "/" + d.ts.maxClients : ""}` : "—";
-					el("s-cpu").textContent = d.cpu ? `${d.cpu.percent.toFixed(0)}%` : "—";
-					el("s-ram").textContent = d.mem ? `${d.mem.percent.toFixed(0)}%` : "—";
-					el("s-disk").textContent = d.disk ? `${d.disk.percent.toFixed(0)}%` : "—";
-					el("s-temp").textContent = d.temps?.length
-						? d.temps.map((t) => `${t.celsius.toFixed(0)}°`).join("/")
-						: "—";
+
+					const cpuPct = d.cpu?.percent ?? null;
+					const ramPct = d.mem?.percent ?? null;
+					const diskPct = d.disk?.percent ?? null;
+					const tempC = d.temps?.[0]?.celsius ?? null;
+
+					el("s-cpu").textContent = cpuPct != null ? `${cpuPct.toFixed(0)}%` : "—";
+					el("s-ram").textContent = ramPct != null ? `${ramPct.toFixed(0)}%` : "—";
+					el("s-disk").textContent = diskPct != null ? `${diskPct.toFixed(0)}%` : "—";
+					el("s-temp").textContent = tempC != null ? `${tempC.toFixed(0)}°` : "—";
 					el("s-uptime").textContent = d.uptime ? fmtUptime(d.uptime.host) : "—";
 					el("s-clock").textContent = d.clock
-						? new Date(d.clock.iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+						? new Date(d.clock.iso).toLocaleTimeString([], {
+								hour: "2-digit",
+								minute: "2-digit",
+								timeZone: d.clock.timezone,
+								timeZoneName: "short",
+							})
 						: "—";
+
+					setBar("s-cpu", cpuPct);
+					setBar("s-ram", ramPct);
+					setBar("s-disk", diskPct);
+					setCellState("s-temp", tempC, 65, 80);
 				} catch {
-					["s-ts", "s-clients", "s-cpu", "s-ram", "s-disk", "s-temp", "s-uptime", "s-clock"].forEach((id) => {
-						const e = document.getElementById(id);
-						e.textContent = "—";
-						e.className = "v";
+					document.getElementById("s-ts-text").textContent = "offline";
+					document.getElementById("s-ts-text").className = "server-status bad";
+					document.getElementById("s-clients").textContent = "—";
+					["s-cpu", "s-ram", "s-disk", "s-temp", "s-uptime", "s-clock"].forEach((id) => {
+						document.getElementById(id).textContent = "—";
 					});
 				}
 			}
