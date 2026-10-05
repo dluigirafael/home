@@ -32,6 +32,8 @@ let playing = false;
 
 const pct = () => (dur > 0 ? Math.min(100, (pos / dur) * 100) : 0);
 
+// ─── Now playing ─────────────────────────────────────────────
+
 function renderNow() {
 	const np = window.__np;
 	if (!np) {
@@ -56,16 +58,10 @@ function renderQueue(upcoming, total) {
 	const listCount = upcoming?.length || 0;
 	const queueTotal = Number(total) || listCount;
 
-	if (listCount === 0 && queueTotal === 0) {
-		$queue.innerHTML = "";
-		return;
-	}
-
 	if (listCount === 0) {
 		$queue.innerHTML = "";
 		return;
 	}
-
 	$queue.innerHTML = `
     <div class="queue">
       <h2><span>Up Next</span><span class="count">${queueTotal}</span></h2>
@@ -86,11 +82,14 @@ function renderQueue(upcoming, total) {
       </ol>
     </div>`;
 }
+
 function tick() {
 	if (!playing || !window.__np) return;
 	pos = Math.min(pos + 1, dur);
-	document.getElementById("pos").textContent = fmt(pos);
-	document.getElementById("bar").style.width = `${pct()}%`;
+	const $p = document.getElementById("pos");
+	const $b = document.getElementById("bar");
+	if ($p) $p.textContent = fmt(pos);
+	if ($b) $b.style.width = `${pct()}%`;
 }
 
 async function poll() {
@@ -126,22 +125,22 @@ async function poll() {
 	}
 }
 
-function sparkline(values, color = "#8a8d94") {
+// ─── Sparklines ──────────────────────────────────────────────
+
+function sparklineSvg(values, color, w, h, strokeW) {
 	if (!values || values.length < 2) return "";
-	const w = 100,
-		h = 16;
 	const max = Math.max(...values, 1);
 	const step = w / (values.length - 1);
 	const points = values.map((v, i) => `${(i * step).toFixed(1)},${(h - (v / max) * h).toFixed(1)}`).join(" ");
 	return `<svg class="spark-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-    <polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+    <polyline points="${points}" fill="none" stroke="${color}" stroke-width="${strokeW}" vector-effect="non-scaling-stroke"/>
   </svg>`;
 }
 
 function setSparkline(id, values) {
 	const el = document.getElementById(`${id}-spark`);
 	if (!el) return;
-	el.innerHTML = sparkline(values);
+	el.innerHTML = sparklineSvg(values, "#8a8d94", 100, 16, 1.5);
 }
 
 function setCellState(id, value, warnAt, hotAt) {
@@ -150,6 +149,8 @@ function setCellState(id, value, warnAt, hotAt) {
 	cell.classList.toggle("warn", value != null && value >= warnAt && value < hotAt);
 	cell.classList.toggle("hot", value != null && value >= hotAt);
 }
+
+// ─── Health ──────────────────────────────────────────────────
 
 function renderHealth(containers) {
 	const wrap = document.querySelector(".health-wrap");
@@ -167,10 +168,23 @@ function renderHealth(containers) {
 		.map((c) => {
 			const cls = c.state === "running" ? "ok" : c.state === "partial" ? "warn" : "bad";
 			const count = c.state === "partial" ? ` ${c.running}/${c.total}` : "";
-			return `<span class="h-item">
+			const up = c.uptime != null ? fmtUptime(c.uptime) : "";
+			const badRestarts = c.restarts > 5;
+			const mem = c.memMB != null ? `${c.memMB} MB` : "";
+			const slug = c.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+			return `<div class="h-item">
+        <img class="h-icon" src="/icons/${slug}.svg" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
         <span class="h-dot ${cls}"></span>
-        <span>${esc(c.name)}${count}</span>
-      </span>`;
+        <div class="h-meta">
+          <span class="h-name">${esc(c.name)}${count}</span>
+          <span class="h-sub">
+            ${up ? `<span>${up}</span>` : ""}
+            ${mem ? `<span>${mem}</span>` : ""}
+            ${c.restarts ? `<span class="${badRestarts ? "bad" : ""}">↻ ${c.restarts}</span>` : ""}
+          </span>
+        </div>
+        <span class="h-graph">${sparklineSvg(c.memHistory, "#8a8d94", 60, 12, 1.2)}</span>
+      </div>`;
 		})
 		.join("");
 }
@@ -193,6 +207,9 @@ function renderBuild(build) {
 	}
 	el.innerHTML = parts.join(" · ") || "";
 }
+
+// ─── Stats ───────────────────────────────────────────────────
+
 async function pollStats() {
 	const el = (id) => document.getElementById(id);
 	try {

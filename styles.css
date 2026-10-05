@@ -8,7 +8,6 @@
     --text: #ececec;
     --muted: #8a8d94;
     --dim: #5a5d64;
-    --accent: #4ea1ff;
     --ok: #4ade80;
     --bad: #ef4444;
     --warn: #fbbf24;
@@ -51,7 +50,7 @@ body::before {
 .card {
     position: relative;
     z-index: 1;
-    width: min(94vw, 640px);
+    width: min(94vw, 720px);
     min-width: 0;
     background: linear-gradient(180deg, var(--card-hi) 0%, var(--card-lo) 100%);
     border: 1px solid var(--border);
@@ -300,7 +299,7 @@ body::before {
     padding-top: .2rem;
 }
 
-/* ─── resources (with sparklines) ─── */
+/* ─── resources ─── */
 
 .resources {
     display: grid;
@@ -347,7 +346,7 @@ body::before {
 .spark-svg {
     display: block;
     width: 100%;
-    height: 16px;
+    height: 100%;
     overflow: visible;
 }
 
@@ -371,7 +370,7 @@ body::before {
     stroke: var(--bad);
 }
 
-/* ─── meta (secondary row) ─── */
+/* ─── meta ─── */
 
 .meta {
     display: grid;
@@ -435,22 +434,29 @@ body::before {
     text-transform: uppercase;
     color: var(--dim);
     font-weight: 500;
-    margin-bottom: .55rem;
+    margin-bottom: .65rem;
 }
 
 .health {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .4rem .9rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .55rem 1rem;
 }
 
 .h-item {
-    display: inline-flex;
-    align-items: center;
-    gap: .4rem;
-    font-size: .78rem;
-    color: var(--muted);
+    display: grid;
+    grid-template-columns: 18px 6px 1fr 60px;
+    align-items: start;
+    gap: .55rem;
     min-width: 0;
+}
+
+.h-icon {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    filter: grayscale(.35);
+    margin-top: .12rem;
 }
 
 .h-dot {
@@ -459,6 +465,7 @@ body::before {
     border-radius: 50%;
     background: var(--dim);
     flex-shrink: 0;
+    margin-top: .42rem;
 }
 
 .h-dot.ok {
@@ -466,8 +473,46 @@ body::before {
     box-shadow: 0 0 6px rgba(74, 222, 128, .4);
 }
 
+.h-dot.warn {
+    background: var(--warn);
+    box-shadow: 0 0 6px rgba(251, 191, 36, .4);
+}
+
 .h-dot.bad {
     background: var(--bad);
+}
+
+.h-meta {
+    display: flex;
+    flex-direction: column;
+    gap: .05rem;
+    min-width: 0;
+}
+
+.h-name {
+    font-size: .8rem;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.h-sub {
+    display: flex;
+    gap: .55rem;
+    font-size: .65rem;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+}
+
+.h-sub .bad {
+    color: var(--bad);
+}
+
+.h-graph {
+    display: block;
+    height: 12px;
+    margin-top: .28rem;
 }
 
 /* ─── build footer ─── */
@@ -495,11 +540,6 @@ body::before {
 
 .build a:hover {
     color: var(--muted);
-}
-
-.h-dot.warn {
-    background: var(--warn);
-    box-shadow: 0 0 6px rgba(251, 191, 36, .4);
 }
 
 /* ─── responsive ─── */
@@ -567,7 +607,7 @@ body::before {
         padding: .9rem 1.25rem 1rem;
     }
 
-    .h-item {
-        font-size: .72rem;
+    .health {
+        grid-template-columns: 1fr;
     }
 }
