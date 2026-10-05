@@ -40,26 +40,43 @@ const json = (res, code, body) => {
 	res.end(typeof body === "string" ? body : JSON.stringify(body));
 };
 
+function httpRequest(url, { method = "GET", headers = {}, body = null, timeout = 3000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = http.request(
+      { hostname: u.hostname, port: u.port, path: u.pathname + u.search, method, headers },
+      (res) => {
+        let data = "";
+        res.on("data", (c) => (data += c));
+        res.on("end", () => resolve({ status: res.statusCode, body: data }));
+      }
+    );
+    req.on("error", reject);
+    req.setTimeout(timeout, () => { req.destroy(new Error("timeout")); });
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
 async function tsInfo() {
-	if (!TS_API_KEY) return { online: false, clients: null, maxClients: null };
-	try {
-		const r = await fetch(`http://${TS_HOST}:${TS_QUERY_PORT}/`, {
-			method: "POST",
-			headers: { "content-type": "application/json", "x-api-key": TS_API_KEY },
-			body: JSON.stringify({ cmd: "serverinfo" }),
-			signal: AbortSignal.timeout(3000),
-		});
-		if (!r.ok) return { online: false, clients: null, maxClients: null };
-		const d = await r.json();
-		return {
-			online: true,
-			clients: Number(d.virtualserver_clientsonline ?? d.clientsonline ?? 0) || null,
-			maxClients: Number(d.virtualserver_maxclients ?? d.maxclients ?? 0) || null,
-			name: d.virtualserver_name || null,
-		};
-	} catch {
-		return { online: false, clients: null, maxClients: null };
-	}
+  if (!TS_API_KEY) return { online: false, clients: null, maxClients: null };
+  try {
+    const r = await httpRequest(`http://${TS_HOST}:${TS_QUERY_PORT}/`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": TS_API_KEY },
+      body: JSON.stringify({ cmd: "serverinfo" }),
+    });
+    if (r.status < 200 || r.status >= 300) return { online: false, clients: null, maxClients: null };
+    const d = JSON.parse(r.body);
+    return {
+      online: true,
+      clients: Number(d.virtualserver_clientsonline ?? d.clientsonline ?? 0) || null,
+      maxClients: Number(d.virtualserver_maxclients ?? d.maxclients ?? 0) || null,
+      name: d.virtualserver_name || null,
+    };
+  } catch {
+    return { online: false, clients: null, maxClients: null };
+  }
 }
 
 async function diskInfo() {
