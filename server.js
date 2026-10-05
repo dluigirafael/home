@@ -30,6 +30,7 @@ const PREFERRED_LABELS = [/^Tctl$/i, /^Package id 0$/i, /^Composite$/i, /^CPU/i]
 
 const PAGE = await readFile(join(__dirname, "index.html"));
 const STYLES = await readFile(join(__dirname, "styles.css"));
+const APP = await readFile(join(__dirname, "app.js"));
 
 let musicCache = { body: null, ts: 0 };
 let statsCache = { body: null, ts: 0 };
@@ -243,7 +244,14 @@ const server = http.createServer(async (req, res) => {
 		res.end(PAGE);
 		return;
 	}
-
+	if (path === "/app.js") {
+		res.writeHead(200, {
+		"content-type": "application/javascript; charset=utf-8",
+		"cache-control": "public, max-age=3600",
+		});
+		res.end(APP);
+		return;
+	}
 	if (path === "/styles.css") {
 		res.writeHead(200, {
 			"content-type": "text/css; charset=utf-8",

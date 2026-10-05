@@ -1,5 +1,5 @@
 FROM node:alpine
 WORKDIR /app
-COPY package.json server.js index.html styles.css ./
+COPY . .
 EXPOSE 3000
 CMD ["node", "server.js"]

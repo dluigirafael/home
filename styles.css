@@ -385,7 +385,12 @@ body::before {
     color: var(--bad);
 }
 
-
+.q-playlist {
+  padding: .65rem 0;
+  font-size: .85rem;
+  color: var(--dim);
+  font-style: italic;
+}
 /* ─── responsive ─── */
 
 @media (max-width: 520px) {
