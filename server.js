@@ -171,7 +171,25 @@ function clockInfo() {
 		offsetMinutes: -now.getTimezoneOffset(),
 	};
 }
-
+async function tsHumans() {
+  if (!TS_API_KEY) return null;
+  try {
+    const url = `http://${TS_HOST}:${TS_QUERY_PORT}/1/clientlist`;
+    const r = await httpRequest(url, { headers: { "x-api-key": TS_API_KEY } });
+    if (r.status < 200 || r.status >= 300) return null;
+    const parsed = JSON.parse(r.body);
+    const list = Array.isArray(parsed.body) ? parsed.body : [];
+    return list.filter((c) => {
+      if (String(c.client_type) !== "0") return false;
+      const nick = c.client_nickname || "";
+      if (/^TS6-WebUI-Bot/i.test(nick)) return false;
+      if (/^serveradmin/i.test(nick)) return false;
+      return true;
+    }).length;
+  } catch {
+    return null;
+  }
+}
 async function gatherStats() {
   const [ts, disk, temps, humans] = await Promise.all([
     tsInfo(), diskInfo(), tempInfo(), tsHumans(),
