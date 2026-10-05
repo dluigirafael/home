@@ -117,22 +117,30 @@ async function containersInfo() {
 		for (const c of list) {
 			const name = (c.Names?.[0] || "").replace(/^\//, "");
 			if (!name) continue;
+
+			const state = c.State || "unknown";
+			const status = c.Status || "";
+
+			// Healthy if running, or exited cleanly (one-shot init/permissions containers)
+			const exitedClean = /^Exited \(0\)/.test(status);
+			const ok = state === "running" || exitedClean;
+
 			const labels = c.Labels || {};
 			const project = labels["com.docker.compose.project"] || name;
 			if (!groups.has(project)) groups.set(project, []);
-			groups.get(project).push(c.State || "unknown");
+			groups.get(project).push(ok);
 		}
 
 		return [...groups.entries()]
 			.filter(([project]) => !HEALTH_EXCLUDE.has(project))
-			.map(([project, states]) => {
-				const running = states.filter((s) => s === "running").length;
-				const total = states.length;
-				const state = running === total ? "running" : running === 0 ? "stopped" : "partial";
+			.map(([project, checks]) => {
+				const okCount = checks.filter(Boolean).length;
+				const total = checks.length;
+				const state = okCount === total ? "running" : okCount === 0 ? "stopped" : "partial";
 				return {
 					name: project.replace(/^ix-/, ""),
 					state,
-					running,
+					running: okCount,
 					total,
 				};
 			})
