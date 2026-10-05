@@ -20,6 +20,7 @@ const MANAGER = process.env.MANAGER_URL || "http://ts6-backend:3001";
 
 const BOT_ID = process.env.BOT_ID || "2";
 const CACHE_MS = Number(process.env.CACHE_MS || 3000);
+const BOT_GROUP_NAME = "Bots";
 
 const TS_HOST = process.env.TS_HOST || "teamspeak";
 const TS_QUERY_PORT = process.env.TS_QUERY_PORT || 10080;
@@ -38,6 +39,9 @@ const json = (res, code, body) => {
 	res.writeHead(code, { "content-type": "application/json" });
 	res.end(typeof body === "string" ? body : JSON.stringify(body));
 };
+
+let botGroupCache = { sgid: null, ts: 0 };
+const GROUP_CACHE_MS = 60000;
 
 function httpRequest(url, { method = "GET", headers = {}, timeout = 3000 } = {}) {
 	return new Promise((resolve, reject) => {
@@ -171,19 +175,41 @@ function clockInfo() {
 		offsetMinutes: -now.getTimezoneOffset(),
 	};
 }
+async function getBotGroupId() {
+  const now = Date.now();
+  if (botGroupCache.sgid && now - botGroupCache.ts < GROUP_CACHE_MS) {
+    return botGroupCache.sgid;
+  }
+  try {
+    const url = `http://${TS_HOST}:${TS_QUERY_PORT}/1/servergrouplist`;
+    const r = await httpRequest(url, { headers: { "x-api-key": TS_API_KEY } });
+    if (r.status < 200 || r.status >= 300) return null;
+    const parsed = JSON.parse(r.body);
+    const list = Array.isArray(parsed.body) ? parsed.body : [];
+    const match = list.find((g) => g.name === BOT_GROUP_NAME);
+    if (!match) return null;
+    botGroupCache = { sgid: String(match.sgid), ts: now };
+    return botGroupCache.sgid;
+  } catch {
+    return null;
+  }
+}
+
 async function tsHumans() {
   if (!TS_API_KEY) return null;
   try {
-    const url = `http://${TS_HOST}:${TS_QUERY_PORT}/1/clientlist`;
+    const sgid = await getBotGroupId();
+    if (!sgid) return null;
+
+    const url = `http://${TS_HOST}:${TS_QUERY_PORT}/1/clientlist?-groups`;
     const r = await httpRequest(url, { headers: { "x-api-key": TS_API_KEY } });
     if (r.status < 200 || r.status >= 300) return null;
     const parsed = JSON.parse(r.body);
     const list = Array.isArray(parsed.body) ? parsed.body : [];
     return list.filter((c) => {
       if (String(c.client_type) !== "0") return false;
-      const nick = c.client_nickname || "";
-      if (/^TS6-WebUI-Bot/i.test(nick)) return false;
-      if (/^serveradmin/i.test(nick)) return false;
+      const groups = String(c.client_servergroups || "").split(",").map((s) => s.trim());
+      if (groups.includes(sgid)) return false;
       return true;
     }).length;
   } catch {
