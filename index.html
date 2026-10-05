@@ -1,77 +1,75 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow, noai, noimageai">
-<title>Now Playing</title>
-<link rel="stylesheet" href="/styles.css">
-</head>
-<body>
-  <div class="card">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex, nofollow, noai, noimageai" />
+		<title>Now Playing</title>
+		<link rel="stylesheet" href="/styles.css" />
+	</head>
+	<body>
+		<div class="card">
+			<header class="server">
+				<div class="server-side">
+					<span class="server-label">TeamSpeak</span>
+					<span class="server-status-row">
+						<span class="dot" id="dot"></span>
+						<span class="server-status" id="s-ts-text">—</span>
+					</span>
+				</div>
+				<div class="server-side server-side-right">
+					<span class="server-num" id="s-clients">—</span>
+					<span class="server-label">online</span>
+				</div>
+			</header>
 
-    <header class="server">
-      <div class="server-side">
-        <span class="server-label">TeamSpeak</span>
-        <span class="server-status-row">
-          <span class="dot" id="dot"></span>
-          <span class="server-status" id="s-ts-text">—</span>
-        </span>
-      </div>
-      <div class="server-side server-side-right">
-        <span class="server-num" id="s-clients">—</span>
-        <span class="server-label">online</span>
-      </div>
-    </header>
+			<section class="hero">
+				<div id="now"><span class="empty">Loading…</span></div>
+			</section>
 
-    <section class="hero">
-      <div id="now"><span class="empty">Loading…</span></div>
-    </section>
+			<section id="queue"></section>
 
-    <section id="queue"></section>
+			<section class="resources">
+				<div class="cell">
+					<span class="k">CPU</span>
+					<span class="v" id="s-cpu">—</span>
+					<span class="spark" id="s-cpu-spark"></span>
+				</div>
+				<div class="cell">
+					<span class="k">RAM</span>
+					<span class="v" id="s-ram">—</span>
+					<span class="spark" id="s-ram-spark"></span>
+				</div>
+				<div class="cell">
+					<span class="k">Disk</span>
+					<span class="v" id="s-disk">—</span>
+					<span class="spark" id="s-disk-spark"></span>
+				</div>
+			</section>
 
-    <section class="resources">
-      <div class="cell">
-        <span class="k">CPU</span>
-        <span class="v" id="s-cpu">—</span>
-        <span class="spark" id="s-cpu-spark"></span>
-      </div>
-      <div class="cell">
-        <span class="k">RAM</span>
-        <span class="v" id="s-ram">—</span>
-        <span class="spark" id="s-ram-spark"></span>
-      </div>
-      <div class="cell">
-        <span class="k">Disk</span>
-        <span class="v" id="s-disk">—</span>
-        <span class="spark" id="s-disk-spark"></span>
-      </div>
-    </section>
+			<section class="meta">
+				<div class="cell">
+					<span class="k">Temp</span>
+					<span class="v" id="s-temp">—</span>
+				</div>
+				<div class="cell">
+					<span class="k">Uptime</span>
+					<span class="v" id="s-uptime">—</span>
+				</div>
+				<div class="cell">
+					<span class="k">Time</span>
+					<span class="v" id="s-clock">—</span>
+				</div>
+			</section>
 
-    <section class="meta">
-      <div class="cell">
-        <span class="k">Temp</span>
-        <span class="v" id="s-temp">—</span>
-      </div>
-      <div class="cell">
-        <span class="k">Uptime</span>
-        <span class="v" id="s-uptime">—</span>
-      </div>
-      <div class="cell">
-        <span class="k">Time</span>
-        <span class="v" id="s-clock">—</span>
-      </div>
-    </section>
+			<section class="health-wrap">
+				<span class="health-label">Services</span>
+				<div class="health" id="health"></div>
+			</section>
 
-    <section class="health-wrap">
-      <span class="health-label">Services</span>
-      <div class="health" id="health"></div>
-    </section>
+			<footer class="build" id="build"></footer>
+		</div>
 
-    <footer class="build" id="build"></footer>
-
-  </div>
-
-  <script src="/app.js" type="module"></script>
-</body>
+		<script src="/app.js" type="module"></script>
+	</body>
 </html>

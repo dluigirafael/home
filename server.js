@@ -6,13 +6,13 @@ import { dirname, join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-const DOCKER_PROXY = process.env.DOCKER_PROXY || 'http://docker-socket-proxy:2375';
+const DOCKER_PROXY = process.env.DOCKER_PROXY || "http://docker-socket-proxy:2375";
 
 const HEALTH_EXCLUDE = new Set(
-  (process.env.HEALTH_EXCLUDE || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
+	(process.env.HEALTH_EXCLUDE || "")
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean),
 );
 
 const HISTORY_SIZE = 60;
@@ -94,45 +94,56 @@ async function tsInfo() {
 	}
 }
 function dockerRequest(path, timeout = 3000) {
-  return new Promise((resolve, reject) => {
-    const u = new URL(DOCKER_PROXY);
-    const req = http.request(
-      { hostname: u.hostname, port: u.port, path, method: 'GET' },
-      (res) => {
-        let data = '';
-        res.on('data', (c) => (data += c));
-        res.on('end', () => resolve({ status: res.statusCode, body: data }));
-      }
-    );
-    req.on('error', reject);
-    req.setTimeout(timeout, () => req.destroy(new Error('timeout')));
-    req.end();
-  });
+	return new Promise((resolve, reject) => {
+		const u = new URL(DOCKER_PROXY);
+		const req = http.request({ hostname: u.hostname, port: u.port, path, method: "GET" }, (res) => {
+			let data = "";
+			res.on("data", (c) => (data += c));
+			res.on("end", () => resolve({ status: res.statusCode, body: data }));
+		});
+		req.on("error", reject);
+		req.setTimeout(timeout, () => req.destroy(new Error("timeout")));
+		req.end();
+	});
 }
 
 async function containersInfo() {
-  try {
-    const r = await dockerRequest('/containers/json?all=true');
-    if (r.status !== 200) return [];
-    const list = JSON.parse(r.body);
-    return list
-      .map((c) => {
-        const name = (c.Names?.[0] || '').replace(/^\//, '');
-        return {
-          name,
-          image: c.Image,
-          state: c.State,
-          status: c.Status,
-        };
-      })
-      .filter((c) => c.name && !HEALTH_EXCLUDE.has(c.name));
-  } catch {
-    return [];
-  }
+	try {
+		const r = await dockerRequest("/containers/json?all=true");
+		if (r.status !== 200) return [];
+		const list = JSON.parse(r.body);
+
+		const groups = new Map();
+		for (const c of list) {
+			const name = (c.Names?.[0] || "").replace(/^\//, "");
+			if (!name) continue;
+			const labels = c.Labels || {};
+			const project = labels["com.docker.compose.project"] || name;
+			if (!groups.has(project)) groups.set(project, []);
+			groups.get(project).push(c.State || "unknown");
+		}
+
+		return [...groups.entries()]
+			.filter(([project]) => !HEALTH_EXCLUDE.has(project))
+			.map(([project, states]) => {
+				const running = states.filter((s) => s === "running").length;
+				const total = states.length;
+				const state = running === total ? "running" : running === 0 ? "stopped" : "partial";
+				return {
+					name: project.replace(/^ix-/, ""),
+					state,
+					running,
+					total,
+				};
+			})
+			.sort((a, b) => a.name.localeCompare(b.name));
+	} catch {
+		return [];
+	}
 }
 async function diskInfo() {
 	try {
-		const { stdout } = await execFileAsync('df', ['-k', '/']);
+		const { stdout } = await execFileAsync("df", ["-k", "/"]);
 		const line = stdout.trim().split("\n")[1];
 		const [, blocks, used, avail] = line.split(/\s+/);
 		const total = Number(blocks) * 1024;
@@ -226,86 +237,88 @@ function clockInfo() {
 	};
 }
 async function getBotGroupId() {
-  const now = Date.now();
-  if (botGroupCache.sgid && now - botGroupCache.ts < GROUP_CACHE_MS) {
-    return botGroupCache.sgid;
-  }
-  try {
-    const url = `http://${TS_HOST}:${TS_QUERY_PORT}/1/servergrouplist`;
-    const r = await httpRequest(url, { headers: { "x-api-key": TS_API_KEY } });
-    if (r.status < 200 || r.status >= 300) return null;
-    const parsed = JSON.parse(r.body);
-    const list = Array.isArray(parsed.body) ? parsed.body : [];
-    const match = list.find((g) => g.name === BOT_GROUP_NAME);
-    if (!match) return null;
-    botGroupCache = { sgid: String(match.sgid), ts: now };
-    return botGroupCache.sgid;
-  } catch {
-    return null;
-  }
+	const now = Date.now();
+	if (botGroupCache.sgid && now - botGroupCache.ts < GROUP_CACHE_MS) {
+		return botGroupCache.sgid;
+	}
+	try {
+		const url = `http://${TS_HOST}:${TS_QUERY_PORT}/1/servergrouplist`;
+		const r = await httpRequest(url, { headers: { "x-api-key": TS_API_KEY } });
+		if (r.status < 200 || r.status >= 300) return null;
+		const parsed = JSON.parse(r.body);
+		const list = Array.isArray(parsed.body) ? parsed.body : [];
+		const match = list.find((g) => g.name === BOT_GROUP_NAME);
+		if (!match) return null;
+		botGroupCache = { sgid: String(match.sgid), ts: now };
+		return botGroupCache.sgid;
+	} catch {
+		return null;
+	}
 }
 
 async function tsHumans() {
-  if (!TS_API_KEY) return null;
-  try {
-    const sgid = await getBotGroupId();
-    if (!sgid) return null;
+	if (!TS_API_KEY) return null;
+	try {
+		const sgid = await getBotGroupId();
+		if (!sgid) return null;
 
-    const url = `http://${TS_HOST}:${TS_QUERY_PORT}/1/clientlist?-groups`;
-    const r = await httpRequest(url, { headers: { "x-api-key": TS_API_KEY } });
-    if (r.status < 200 || r.status >= 300) return null;
-    const parsed = JSON.parse(r.body);
-    const list = Array.isArray(parsed.body) ? parsed.body : [];
-    return list.filter((c) => {
-      if (String(c.client_type) !== "0") return false;
-      const groups = String(c.client_servergroups || "").split(",").map((s) => s.trim());
-      if (groups.includes(sgid)) return false;
-      return true;
-    }).length;
-  } catch {
-    return null;
-  }
+		const url = `http://${TS_HOST}:${TS_QUERY_PORT}/1/clientlist?-groups`;
+		const r = await httpRequest(url, { headers: { "x-api-key": TS_API_KEY } });
+		if (r.status < 200 || r.status >= 300) return null;
+		const parsed = JSON.parse(r.body);
+		const list = Array.isArray(parsed.body) ? parsed.body : [];
+		return list.filter((c) => {
+			if (String(c.client_type) !== "0") return false;
+			const groups = String(c.client_servergroups || "")
+				.split(",")
+				.map((s) => s.trim());
+			if (groups.includes(sgid)) return false;
+			return true;
+		}).length;
+	} catch {
+		return null;
+	}
 }
 async function gatherStats() {
-  const [ts, disk, temps, humans, containers] = await Promise.all([
-    tsInfo(),
-    diskInfo(),
-    tempInfo(),
-    tsHumans(),
-    containersInfo(),
-  ]);
+	const [ts, disk, temps, humans, containers] = await Promise.all([
+		tsInfo(),
+		diskInfo(),
+		tempInfo(),
+		tsHumans(),
+		containersInfo(),
+	]);
 
-  const cpu = cpuInfo();
-  const mem = memInfo();
+	const cpu = cpuInfo();
+	const mem = memInfo();
 
-  const push = (arr, v) => {
-    arr.push(Number.isFinite(v) ? Number(v.toFixed(1)) : 0);
-    if (arr.length > HISTORY_SIZE) arr.shift();
-  };
-  push(history.cpu, cpu.percent);
-  push(history.ram, mem.percent);
-  push(history.disk, disk?.percent ?? 0);
+	const push = (arr, v) => {
+		arr.push(Number.isFinite(v) ? Number(v.toFixed(1)) : 0);
+		if (arr.length > HISTORY_SIZE) arr.shift();
+	};
+	push(history.cpu, cpu.percent);
+	push(history.ram, mem.percent);
+	push(history.disk, disk?.percent ?? 0);
 
-  return {
-    ts: { ...ts, clients: humans ?? ts.clients },
-    cpu,
-    mem,
-    disk,
-    temps,
-    uptime: uptimeInfo(),
-    clock: clockInfo(),
-    containers,
-    history: {
-      cpu: [...history.cpu],
-      ram: [...history.ram],
-      disk: [...history.disk],
-    },
-    build: {
-      sha: process.env.GIT_SHA || null,
-      date: process.env.BUILD_DATE || null,
-      runUrl: process.env.GH_RUN_URL || null,
-    },
-  };
+	return {
+		ts: { ...ts, clients: humans ?? ts.clients },
+		cpu,
+		mem,
+		disk,
+		temps,
+		uptime: uptimeInfo(),
+		clock: clockInfo(),
+		containers,
+		history: {
+			cpu: [...history.cpu],
+			ram: [...history.ram],
+			disk: [...history.disk],
+		},
+		build: {
+			sha: process.env.GIT_SHA || null,
+			date: process.env.BUILD_DATE || null,
+			runUrl: process.env.GH_RUN_URL || null,
+		},
+	};
 }
 const server = http.createServer(async (req, res) => {
 	if (req.method !== "GET") {
@@ -322,8 +335,8 @@ const server = http.createServer(async (req, res) => {
 	}
 	if (path === "/app.js") {
 		res.writeHead(200, {
-		"content-type": "application/javascript; charset=utf-8",
-		"cache-control": "public, max-age=3600",
+			"content-type": "application/javascript; charset=utf-8",
+			"cache-control": "public, max-age=3600",
 		});
 		res.end(APP);
 		return;
