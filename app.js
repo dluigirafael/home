@@ -24,7 +24,7 @@ const TICK_MS = 1000;
 
 let pos = 0;
 let dur = 0;
-let trackId = null;
+let trackId = undefined;
 let playing = false;
 
 const pct = () => (dur > 0 ? Math.min(100, (pos / dur) * 100) : 0);
