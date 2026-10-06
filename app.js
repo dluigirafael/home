@@ -1,14 +1,7 @@
-const $now = document.getElementById("now");
-const $queue = document.getElementById("queue");
-const $dot = document.getElementById("dot");
-const $health = document.getElementById("health");
-const $healthWrap = document.querySelector(".health-wrap");
-
-const esc = (s) =>
-	String(s).replace(
-		/[&<>"']/g,
-		(c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
-	);
+const $ = (id) => document.getElementById(id);
+const text = (n, t) => n && n.textContent !== t && (n.textContent = t);
+const attr = (n, k, v) => n && n.getAttribute(k) !== v && n.setAttribute(k, v);
+const show = (n, on) => n && (n.hidden = !on);
 
 const fmt = (sec) => {
 	sec = Math.max(0, Math.floor(sec || 0));
@@ -31,18 +24,11 @@ const FETCH_MS = 8000;
 let pos = 0;
 let dur = 0;
 let trackId;
-let nowKey;
-let queueSig = null;
 let musicStatus = "idle";
 let tsOnline = false;
+let nowPlaying = null;
 
 const pct = () => (dur > 0 ? Math.min(100, (pos / dur) * 100) : 0);
-
-const el = (id) => document.getElementById(id);
-const setText = (node, t) => node && node.textContent !== t && (node.textContent = t);
-const setHTML = (node, h) => node && node.innerHTML !== h && (node.innerHTML = h);
-const setClass = (node, c) => node && node.className !== c && (node.className = c);
-const setWidth = (node, w) => node && node.style.width !== w && (node.style.width = w);
 
 async function fetchJSON(url) {
 	const r = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(FETCH_MS) });
@@ -50,12 +36,11 @@ async function fetchJSON(url) {
 	return r.json();
 }
 
-// waits between runs, so a slow response can never stack on the next one
 const schedule = (fn, ms) =>
-	fn().catch(() => {}).finally(() => setTimeout(() => schedule(fn, ms), ms));
+	fn()
+		.catch(() => {})
+		.finally(() => setTimeout(() => schedule(fn, ms), ms));
 
-// The catalog ships either icon.svg or icon.png for an app, never both:
-// on a failed load we advance to the next file and remember where we got to.
 const ICON_BASE = "https://media.sys.truenas.net/apps";
 const ICON_FILES = ["icon.svg", "icon.png"];
 const iconIdx = new Map();
@@ -66,79 +51,69 @@ function iconUrl(slug) {
 	return idx < ICON_FILES.length ? `${ICON_BASE}/${slug}/icons/${ICON_FILES[idx]}` : null;
 }
 
-window.iconErr = (img) => {
-	const slug = img.dataset.slug;
-	iconIdx.set(slug, (iconIdx.get(slug) ?? 0) + 1);
-	const url = iconUrl(slug);
-	if (url) img.src = url;
-	else img.remove();
-};
+$("health").addEventListener(
+	"error",
+	(e) => {
+		const img = e.target;
+		if (!(img instanceof HTMLImageElement)) return;
+		const slug = img.dataset.slug;
+		iconIdx.set(slug, (iconIdx.get(slug) ?? 0) + 1);
+		const url = iconUrl(slug);
+		if (url) img.src = url;
+		else img.remove();
+	},
+	true,
+);
 
-function renderNow() {
-	const np = window.__np;
-	if (!np) {
-		nowKey = "";
-		setHTML($now, '<span class="empty">Nothing playing</span>');
+const qItems = Array.from({ length: 5 }, () => {
+	const li = $("tpl-queue-item").content.firstElementChild.cloneNode(true);
+	$("q-list").append(li);
+	return li;
+});
+
+function paintProgress() {
+	text($("pos"), fmt(pos));
+	text($("dur"), fmt(dur));
+	$("bar").style.setProperty("--pct", pct());
+}
+
+function renderNow(emptyMsg) {
+	if (!nowPlaying) {
+		text($("np-empty"), emptyMsg);
+		show($("np"), false);
+		show($("np-empty"), true);
 		return;
 	}
-	const key = `${np.title}|${np.artist || ""}`;
-	if (nowKey !== key) {
-		nowKey = key;
-		setHTML(
-			$now,
-			`
-      <div class="title">${esc(np.title || "Unknown")}</div>
-      ${np.artist ? `<div class="artist">${esc(np.artist)}</div>` : ""}
-      <div class="progress">
-        <span class="t" id="pos"></span>
-        <div class="bar"><span id="bar"></span></div>
-        <span class="t" id="dur"></span>
-      </div>`,
-		);
-	}
-	setText(el("pos"), fmt(pos));
-	setText(el("dur"), fmt(dur));
-	setWidth(el("bar"), `${pct()}%`);
+	text($("np-title"), nowPlaying.title || "Unknown");
+	text($("np-artist"), nowPlaying.artist || "");
+	paintProgress();
+	show($("np-empty"), false);
+	show($("np"), true);
 }
 
 function renderQueue(upcoming, total) {
 	const list = (upcoming || []).slice(0, 5);
-	const count = Number(total) || list.length;
-	const sig = `${count}|${list
-		.map((i) => `${i.title || ""}|${i.artist || ""}|${i.duration || ""}`)
-		.join("\u0001")}`;
-	if (sig === queueSig) return;
-	queueSig = sig;
-	if (!list.length) return setHTML($queue, "");
-
-	setHTML(
-		$queue,
-		`
-    <div class="queue">
-      <h2><span>Up Next</span><span class="count">${count}</span></h2>
-      <ol>
-        ${list
-					.map(
-						(i) => `
-          <li>
-            <div class="q-meta">
-              <div class="q-title">${esc(i.title || "Unknown")}</div>
-              ${i.artist ? `<div class="q-artist">${esc(i.artist)}</div>` : ""}
-            </div>
-            ${i.duration ? `<div class="q-dur">${fmt(i.duration)}</div>` : ""}
-          </li>`,
-					)
-					.join("")}
-      </ol>
-    </div>`,
-	);
+	show($("queue"), list.length > 0);
+	if (!list.length) return;
+	text($("q-count"), String(Number(total) || list.length));
+	qItems.forEach((li, i) => {
+		const item = list[i];
+		li.hidden = !item;
+		if (!item) return;
+		text(li.querySelector(".q-title"), item.title || "Unknown");
+		text(li.querySelector(".q-artist"), item.artist || "");
+		text(li.querySelector(".q-dur"), item.duration ? fmt(item.duration) : "");
+	});
 }
 
 function tick() {
-	if (musicStatus !== "playing" || !window.__np) return;
+	if (musicStatus !== "playing" || !nowPlaying) return;
 	pos = Math.min(pos + 1, dur);
-	setText(el("pos"), fmt(pos));
-	setWidth(el("bar"), `${pct()}%`);
+	paintProgress();
+}
+
+function updateDot() {
+	attr($("dot"), "data-state", tsOnline ? (musicStatus === "paused" ? "paused" : "playing") : "offline");
 }
 
 async function poll() {
@@ -146,13 +121,11 @@ async function poll() {
 	try {
 		d = await fetchJSON("/data");
 	} catch {
-		window.__np = null;
+		nowPlaying = null;
 		trackId = undefined;
-		nowKey = undefined;
 		musicStatus = "idle";
-		queueSig = null;
-		setHTML($now, '<span class="empty">Unavailable</span>');
-		setHTML($queue, "");
+		renderNow("Unavailable");
+		renderQueue([]);
 		updateDot();
 		return;
 	}
@@ -164,10 +137,8 @@ async function poll() {
 		trackId = id;
 		pos = d.progress?.position ?? 0;
 		dur = d.progress?.duration ?? np?.duration ?? 0;
-		nowKey = undefined;
-		window.__np = np;
+		nowPlaying = np;
 	} else {
-		// 2s tolerance absorbs polling drift without visibly snapping the bar
 		const serverPos = d.progress?.position ?? 0;
 		if (Math.abs(serverPos - pos) > 2) pos = serverPos;
 		dur = d.progress?.duration ?? np?.duration ?? dur;
@@ -175,82 +146,74 @@ async function poll() {
 
 	musicStatus = d.status === "playing" ? "playing" : d.status === "paused" ? "paused" : "idle";
 	updateDot();
-	renderNow();
+	renderNow("Nothing playing");
 	renderQueue(d.upcoming, d.queueLength);
 }
 
-// offline always wins; otherwise mirror the player (amber while paused)
-function updateDot() {
-	setClass($dot, tsOnline ? `dot ${musicStatus === "paused" ? "paused" : "playing"}` : "dot");
-}
-
-function sparklineSvg(values, color, w, h, stroke) {
-	if (!values || values.length < 2) return "";
+function sparkline(el, values, w, h, stroke) {
+	if (!el) return;
+	if (!values || values.length < 2) {
+		el.replaceChildren();
+		return;
+	}
 	const max = Math.max(...values, 1);
 	const step = w / (values.length - 1);
 	const pts = values.map((v, i) => `${(i * step).toFixed(1)},${(h - (v / max) * h).toFixed(1)}`).join(" ");
-	return `<svg class="spark-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="${stroke}" vector-effect="non-scaling-stroke"/>
+	const html = `<svg class="spark-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <polyline points="${pts}" fill="none" stroke="#8a8d94" stroke-width="${stroke}" vector-effect="non-scaling-stroke"/>
   </svg>`;
+	if (el.innerHTML !== html) el.innerHTML = html;
 }
 
-const setSparkline = (id, values) =>
-	setHTML(el(`${id}-spark`), sparklineSvg(values, "#8a8d94", 100, 16, 1.5));
+function setMetric(id, value) {
+	text($(id), value);
+}
 
-function setCellState(id, value, warnAt, hotAt) {
-	const cell = el(id)?.closest(".cell");
+function setCellLevel(id, value, warnAt, hotAt) {
+	const cell = $(id)?.closest(".cell");
 	if (!cell) return;
-	cell.classList.toggle("warn", value != null && value >= warnAt && value < hotAt);
-	cell.classList.toggle("hot", value != null && value >= hotAt);
+	const level = value != null && value >= hotAt ? "hot" : value != null && value >= warnAt ? "warn" : "";
+	attr(cell, "data-level", level);
 }
 
-// Rows are keyed by container name and updated in place, so the <img> is
-// created once and never re-requested.
 const healthRows = new Map();
 const slugFor = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
 function createRow(c) {
-	const rowEl = document.createElement("div");
-	rowEl.className = "h-item";
-	rowEl.dataset.name = c.name;
+	const row = $("tpl-health").content.firstElementChild.cloneNode(true);
+	row.dataset.name = c.name;
 	const slug = slugFor(c.name);
+	const img = row.querySelector(".h-icon");
 	const src = iconUrl(slug);
-	rowEl.innerHTML = `
-    <img class="h-icon" alt="" loading="lazy"${src ? ` src="${src}" data-slug="${slug}" onerror="iconErr(this)"` : ""}>
-    <span class="h-dot"></span>
-    <div class="h-meta"><span class="h-name"></span><span class="h-sub"></span></div>
-    <span class="h-graph"></span>`;
-	return {
-		el: rowEl,
-		dot: rowEl.querySelector(".h-dot"),
-		name: rowEl.querySelector(".h-name"),
-		sub: rowEl.querySelector(".h-sub"),
-		graph: rowEl.querySelector(".h-graph"),
-		slug,
-	};
+	if (src) {
+		img.dataset.slug = slug;
+		img.src = src;
+	}
+	return row;
 }
 
 function updateRow(row, c) {
 	const state = c.state === "running" ? "ok" : c.state === "partial" ? "warn" : "bad";
-	setClass(row.dot, `h-dot ${state}`);
-	setText(row.name, c.state === "partial" ? `${c.name} ${c.running}/${c.total}` : c.name);
-	const parts = [];
-	if (c.uptime != null) parts.push(`<span>${esc(fmtUptime(c.uptime))}</span>`);
-	if (c.memMB != null) parts.push(`<span>${c.memMB} MB</span>`);
-	if (c.restarts) parts.push(`<span${c.restarts > 5 ? ' class="bad"' : ""}>↻ ${c.restarts}</span>`);
-	setHTML(row.sub, parts.join(""));
-	setHTML(row.graph, sparklineSvg(c.memHistory, "#8a8d94", 60, 12, 1.2));
+	attr(row.querySelector(".h-dot"), "data-state", state);
+	text(row.querySelector(".h-name"), c.state === "partial" ? `${c.name} ${c.running}/${c.total}` : c.name);
+	text(row.querySelector('[data-k="uptime"]'), c.uptime != null ? fmtUptime(c.uptime) : "");
+	text(row.querySelector('[data-k="mem"]'), c.memMB != null ? `${c.memMB} MB` : "");
+	const restarts = row.querySelector('[data-k="restarts"]');
+	text(restarts, c.restarts ? `↻ ${c.restarts}` : "");
+	attr(restarts, "data-state", c.restarts > 5 ? "bad" : "");
+	sparkline(row.querySelector(".h-graph"), c.memHistory, 60, 12, 1.2);
 }
 
 function renderHealth(containers) {
-	if (!$healthWrap || !$health) return;
+	const wrap = $("health-wrap");
+	const list = $("health");
 	if (!containers?.length) {
-		$healthWrap.hidden = true;
-		$health.replaceChildren();
+		show(wrap, false);
+		list.replaceChildren();
 		healthRows.clear();
 		return;
 	}
-	$healthWrap.hidden = false;
+	show(wrap, true);
 
 	const seen = new Set();
 	for (const c of containers) {
@@ -265,30 +228,44 @@ function renderHealth(containers) {
 
 	for (const name of [...healthRows.keys()]) {
 		if (seen.has(name)) continue;
-		healthRows.get(name).el.remove();
+		healthRows.get(name).remove();
 		healthRows.delete(name);
 	}
 
-	// append() on an existing node only moves it — icons are never refetched
 	const order = containers.map((c) => c.name).join("\u0001");
-	const current = [...$health.children].map((n) => n.dataset.name).join("\u0001");
-	if (order !== current) for (const c of containers) $health.append(healthRows.get(c.name).el);
+	const current = [...list.children].map((n) => n.dataset.name).join("\u0001");
+	if (order !== current) for (const c of containers) list.append(healthRows.get(c.name));
 }
 
 function renderBuild(build) {
-	const node = el("build");
-	if (!node) return;
-	if (!build?.sha && !build?.date) return setHTML(node, "");
-	const parts = [];
-	if (build.sha) {
-		const short = esc(build.sha.slice(0, 7));
-		parts.push(build.runUrl ? `<a href="${esc(build.runUrl)}" target="_blank" rel="noopener">${short}</a>` : short);
+	const hasSha = !!build?.sha;
+	const date = build?.date ? new Date(build.date) : null;
+	const hasDate = date && !isNaN(date);
+	show($("build"), hasSha || hasDate);
+	if (!hasSha && !hasDate) return;
+
+	const sha = $("build-sha");
+	if (hasSha) {
+		text(sha, build.sha.slice(0, 7));
+		if (build.runUrl) sha.href = build.runUrl;
+		else sha.removeAttribute("href");
+	} else {
+		text(sha, "");
+		sha.removeAttribute("href");
 	}
-	if (build.date) {
-		const d = new Date(build.date);
-		if (!isNaN(d)) parts.push(d.toISOString().slice(0, 16).replace("T", " ") + "Z");
-	}
-	setHTML(node, parts.join(" · "));
+	show($("build-sep"), hasSha && hasDate);
+	text($("build-date"), hasDate ? date.toISOString().slice(0, 16).replace("T", " ") + "Z" : "");
+}
+
+function statsOffline() {
+	tsOnline = false;
+	updateDot();
+	text($("s-ts-text"), "offline");
+	attr($("s-ts-text"), "data-state", "bad");
+	setMetric("s-clients", "—");
+	["s-cpu", "s-ram", "s-disk", "s-temp", "s-uptime", "s-clock"].forEach((id) => setMetric(id, "—"));
+	["s-cpu", "s-ram", "s-disk"].forEach((id) => sparkline($(id + "-spark"), null));
+	setCellLevel("s-temp", null, 65, 80);
 }
 
 async function pollStats() {
@@ -296,24 +273,16 @@ async function pollStats() {
 	try {
 		d = await fetchJSON("/stats");
 	} catch {
-		tsOnline = false;
-		updateDot();
-		setText(el("s-ts-text"), "offline");
-		setClass(el("s-ts-text"), "server-status bad");
-		setText(el("s-clients"), "—");
-		["s-cpu", "s-ram", "s-disk", "s-temp", "s-uptime", "s-clock"].forEach((id) => setText(el(id), "—"));
-		["s-cpu", "s-ram", "s-disk"].forEach((id) => setSparkline(id, null));
-		setCellState("s-temp", null, 65, 80);
+		statsOffline();
 		return;
 	}
 
 	tsOnline = !!d.ts?.online;
 	updateDot();
-
-	setText(el("s-ts-text"), tsOnline ? "online" : "offline");
-	setClass(el("s-ts-text"), `server-status ${tsOnline ? "ok" : "bad"}`);
-	setText(
-		el("s-clients"),
+	text($("s-ts-text"), tsOnline ? "online" : "offline");
+	attr($("s-ts-text"), "data-state", tsOnline ? "ok" : "bad");
+	setMetric(
+		"s-clients",
 		d.ts?.clients != null ? `${d.ts.clients}${d.ts.maxClients ? "/" + d.ts.maxClients : ""}` : "—",
 	);
 
@@ -322,13 +291,13 @@ async function pollStats() {
 	const diskPct = d.disk?.percent ?? null;
 	const tempC = d.temps?.[0]?.celsius ?? null;
 
-	setText(el("s-cpu"), cpuPct != null ? `${cpuPct.toFixed(0)}%` : "—");
-	setText(el("s-ram"), ramPct != null ? `${ramPct.toFixed(0)}%` : "—");
-	setText(el("s-disk"), diskPct != null ? `${diskPct.toFixed(0)}%` : "—");
-	setText(el("s-temp"), tempC != null ? `${tempC.toFixed(0)}°` : "—");
-	setText(el("s-uptime"), d.uptime ? fmtUptime(d.uptime.host) : "—");
-	setText(
-		el("s-clock"),
+	setMetric("s-cpu", cpuPct != null ? `${cpuPct.toFixed(0)}%` : "—");
+	setMetric("s-ram", ramPct != null ? `${ramPct.toFixed(0)}%` : "—");
+	setMetric("s-disk", diskPct != null ? `${diskPct.toFixed(0)}%` : "—");
+	setMetric("s-temp", tempC != null ? `${tempC.toFixed(0)}°` : "—");
+	setMetric("s-uptime", d.uptime ? fmtUptime(d.uptime.host) : "—");
+	setMetric(
+		"s-clock",
 		d.clock
 			? new Date(d.clock.iso).toLocaleTimeString([], {
 					hour: "2-digit",
@@ -339,10 +308,10 @@ async function pollStats() {
 			: "—",
 	);
 
-	setSparkline("s-cpu", d.history?.cpu);
-	setSparkline("s-ram", d.history?.ram);
-	setSparkline("s-disk", d.history?.disk);
-	setCellState("s-temp", tempC, 65, 80);
+	sparkline($("s-cpu-spark"), d.history?.cpu, 100, 16, 1.5);
+	sparkline($("s-ram-spark"), d.history?.ram, 100, 16, 1.5);
+	sparkline($("s-disk-spark"), d.history?.disk, 100, 16, 1.5);
+	setCellLevel("s-temp", tempC, 65, 80);
 	renderHealth(d.containers);
 	renderBuild(d.build);
 }

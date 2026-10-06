@@ -13,8 +13,8 @@
 				<div class="server-side">
 					<span class="server-label">TeamSpeak</span>
 					<span class="server-status-row">
-						<span class="dot" id="dot"></span>
-						<span class="server-status" id="s-ts-text">—</span>
+						<span class="dot" id="dot" data-state="offline"></span>
+						<span class="server-status" id="s-ts-text" data-state="bad">—</span>
 					</span>
 				</div>
 				<div class="server-side server-side-right">
@@ -24,10 +24,26 @@
 			</header>
 
 			<section class="hero">
-				<div id="now"><span class="empty">Loading…</span></div>
+				<div id="now">
+					<span class="empty" id="np-empty">Loading…</span>
+					<div class="np" id="np" hidden>
+						<div class="title" id="np-title"></div>
+						<div class="artist" id="np-artist"></div>
+						<div class="progress">
+							<span class="t" id="pos"></span>
+							<div class="bar"><span id="bar"></span></div>
+							<span class="t" id="dur"></span>
+						</div>
+					</div>
+				</div>
 			</section>
 
-			<section id="queue"></section>
+			<section id="queue" hidden>
+				<div class="queue">
+					<h2><span>Up Next</span><span class="count" id="q-count"></span></h2>
+					<ol id="q-list"></ol>
+				</div>
+			</section>
 
 			<section class="resources">
 				<div class="cell">
@@ -62,13 +78,43 @@
 				</div>
 			</section>
 
-			<section class="health-wrap">
+			<section class="health-wrap" id="health-wrap" hidden>
 				<span class="health-label">Services</span>
 				<div class="health" id="health"></div>
 			</section>
 
-			<footer class="build" id="build"></footer>
+			<footer class="build" id="build" hidden>
+				<a id="build-sha" target="_blank" rel="noopener"></a>
+				<span id="build-sep" hidden> · </span>
+				<span id="build-date"></span>
+			</footer>
 		</div>
+
+		<template id="tpl-queue-item">
+			<li hidden>
+				<div class="q-meta">
+					<div class="q-title"></div>
+					<div class="q-artist"></div>
+				</div>
+				<div class="q-dur"></div>
+			</li>
+		</template>
+
+		<template id="tpl-health">
+			<div class="h-item">
+				<img class="h-icon" alt="" loading="lazy" />
+				<span class="h-dot"></span>
+				<div class="h-meta">
+					<span class="h-name"></span>
+					<span class="h-sub">
+						<span data-k="uptime"></span>
+						<span data-k="mem"></span>
+						<span data-k="restarts"></span>
+					</span>
+				</div>
+				<span class="h-graph"></span>
+			</div>
+		</template>
 
 		<script src="/app.js" type="module"></script>
 	</body>
