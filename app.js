@@ -43,12 +43,10 @@ const schedule = (fn, ms) =>
 
 const ICON_BASE = "https://media.sys.truenas.net/apps";
 const ICON_FILES = ["icon.svg", "icon.png"];
-const iconIdx = new Map();
+const DEFAULT_ICON = "https://www.truenas.com/favicon.ico";
 
-function iconUrl(slug) {
-	const idx = iconIdx.get(slug) ?? 0;
-	iconIdx.set(slug, idx);
-	return idx < ICON_FILES.length ? `${ICON_BASE}/${slug}/icons/${ICON_FILES[idx]}` : null;
+function iconUrl(slug, index = 0) {
+	return index < ICON_FILES.length ? `${ICON_BASE}/${slug}/icons/${ICON_FILES[index]}` : null;
 }
 
 $("health").addEventListener(
@@ -56,11 +54,19 @@ $("health").addEventListener(
 	(e) => {
 		const img = e.target;
 		if (!(img instanceof HTMLImageElement)) return;
+		if (img.dataset.fallback) {
+			img.remove();
+			return;
+		}
 		const slug = img.dataset.slug;
-		iconIdx.set(slug, (iconIdx.get(slug) ?? 0) + 1);
-		const url = iconUrl(slug);
+		const index = Number(img.dataset.iconIndex || 0) + 1;
+		img.dataset.iconIndex = index;
+		const url = iconUrl(slug, index);
 		if (url) img.src = url;
-		else img.remove();
+		else {
+			img.dataset.fallback = "true";
+			img.src = DEFAULT_ICON;
+		}
 	},
 	true,
 );

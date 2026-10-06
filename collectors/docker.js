@@ -1,4 +1,3 @@
-import http from "node:http";
 import {
 	DOCKER_PROXY,
 	DOCKER_TIMEOUT,
@@ -112,16 +111,7 @@ async function containerMemoryMB(id) {
     return cached?.mb ?? 0;
   }
 }
-function dockerRequest(path, timeout = DOCKER_TIMEOUT) {
-	return new Promise((resolve, reject) => {
-		const u = new URL(DOCKER_PROXY);
-		const req = http.request({ hostname: u.hostname, port: u.port, path, method: "GET" }, (res) => {
-			let data = "";
-			res.on("data", (c) => (data += c));
-			res.on("end", () => resolve({ status: res.statusCode, body: data }));
-		});
-		req.on("error", reject);
-		req.setTimeout(timeout, () => req.destroy(new Error("timeout")));
-		req.end();
-	});
+async function dockerRequest(path, timeout = DOCKER_TIMEOUT) {
+  const res = await fetch(new URL(path, DOCKER_PROXY), { signal: AbortSignal.timeout(timeout) });
+  return { status: res.status, body: await res.text() };
 }

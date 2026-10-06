@@ -477,6 +477,7 @@ body::before {
     object-fit: contain;
     filter: grayscale(.35);
     margin-top: .12rem;
+    background: white;
 }
 
 .h-icon:not([src]) {
