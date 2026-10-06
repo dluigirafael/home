@@ -172,7 +172,7 @@ function renderHealth(containers) {
 			const badRestarts = c.restarts > 5;
 			const mem = c.memMB != null ? `${c.memMB} MB` : "";
 			const slug = c.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-			const iconUrl = `https://media.sys.truenas.net/apps/${slug}/icons/logo.svg`;
+			const iconUrl = `https://media.sys.truenas.net/apps/${slug}/icons/icon.svg`;
 			return `<div class="h-item">
         <img class="h-icon" src="${iconUrl}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
         <span class="h-dot ${cls}"></span>
