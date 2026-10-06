@@ -1,15 +1,29 @@
+import http from "node:http";
 import { TS_HOST, TS_PORT, TS_API_KEY, TS_BOT_GROUP, TS_TIMEOUT } from "../config.js";
 
 const OFFLINE = { online: false, clients: null, maxClients: null };
 
-async function request(path) {
-	const res = await fetch(`http://${TS_HOST}:${TS_PORT}${path}`, {
-		headers: { "x-api-key": TS_API_KEY },
-		signal: AbortSignal.timeout(TS_TIMEOUT),
+function request(path) {
+	return new Promise((resolve, reject) => {
+		const req = http.request(
+			{
+				hostname: TS_HOST,
+				port: TS_PORT,
+				path,
+				method: "GET",
+				headers: { "x-api-key": TS_API_KEY },
+			},
+			(res) => {
+				let body = "";
+				res.on("data", (c) => (body += c));
+				res.on("end", () => resolve({ status: res.statusCode, body }));
+			},
+		);
+		req.on("error", reject);
+		req.setTimeout(TS_TIMEOUT, () => req.destroy(new Error("timeout")));
+		req.end();
 	});
-	return { status: res.status, body: await res.text() };
 }
-
 export async function collectTs() {
 	if (!TS_API_KEY) return { info: OFFLINE, humans: null };
 
