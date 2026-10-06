@@ -1,12 +1,12 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { MANAGER_URL, BOT_ID, MUSIC_CACHE_MS, WIDGET_TOKEN } from "./config.js";
 
 const STATIC = {
-	"/": "index.html",
-	"/index.html": "index.html",
-	"/styles.css": "styles.css",
-	"/app.js": "app.js",
+	"/": { file: "index.html", cache: "no-cache" },
+	"/index.html": { file: "index.html", cache: "no-cache" },
+	"/styles.css": { file: "styles.css", cache: "no-cache" },
+	"/app.js": { file: "app.js", cache: "no-cache" },
 };
 
 const TYPES = {
@@ -23,15 +23,23 @@ export function createRouter({ rootDir, stats }) {
 		res.end(typeof body === "string" ? body : JSON.stringify(body));
 	}
 
-	async function serveStatic(res, file) {
+	async function serveStatic(req, res, file) {
 		try {
-			const body = await readFile(join(rootDir, file));
-			const ext = file.slice(file.lastIndexOf(".") + 1);
-			res.writeHead(200, {
-				"content-type": TYPES[ext] || "application/octet-stream",
-				"cache-control": "public, max-age=3600",
-			});
-			res.end(body);
+			const path = join(rootDir, file);
+			const [body, info] = await Promise.all([readFile(path), stat(path)]);
+			const etag = `"${info.mtimeMs.toString(16)}-${info.size.toString(16)}"`;
+			const headers = {
+				"content-type": TYPES[file.slice(file.lastIndexOf(".") + 1)] || "application/octet-stream",
+				"cache-control": STATIC[req.url.split("?")[0]].cache,
+				etag,
+			};
+
+			if (req.headers["if-none-match"] === etag) {
+				res.writeHead(304, headers).end();
+				return;
+			}
+			res.writeHead(200, headers);
+			res.end(req.method === "HEAD" ? undefined : body);
 		} catch {
 			res.writeHead(404).end();
 		}
@@ -48,11 +56,12 @@ export function createRouter({ rootDir, stats }) {
 				`${MANAGER_URL}/api/widget/player/${BOT_ID}/data?token=${encodeURIComponent(WIDGET_TOKEN)}`,
 				{ signal: AbortSignal.timeout(5000) },
 			);
-			const body = await r.text();
-			if (!r.ok) return json(res, 502, { error: "upstream", status: r.status });
-			music = { body, ts: now };
-			return json(res, 200, body);
+			if (!r.ok) throw new Error(`upstream ${r.status}`);
+			music = { body: await r.text(), ts: Date.now() };
+			return json(res, 200, music.body);
 		} catch (e) {
+			// last good payload beats a blank player while the manager is down
+			if (music.body) return json(res, 200, music.body);
 			return json(res, 502, { error: "unreachable", message: e.message });
 		}
 	}
@@ -60,22 +69,22 @@ export function createRouter({ rootDir, stats }) {
 	async function serveStats(res) {
 		const cached = stats.peek();
 		if (cached) return json(res, 200, cached);
-		return json(res, 200, await stats.get());
+
+		const fresh = await stats.get();
+		if (!fresh) return json(res, 503, { error: "no stats yet" });
+		return json(res, 200, fresh);
 	}
 
-
 	return async function route(req, res) {
-		if (req.method !== "GET") {
+		if (req.method !== "GET" && req.method !== "HEAD") {
 			res.writeHead(405).end();
 			return;
 		}
 
 		const path = new URL(req.url, "http://x").pathname;
+		const entry = STATIC[path];
 
-		if (STATIC[path]) return serveStatic(res, STATIC[path]);
-
-
-
+		if (entry) return serveStatic(req, res, entry.file);
 		if (path === "/data") return serveData(res);
 		if (path === "/stats") return serveStats(res);
 

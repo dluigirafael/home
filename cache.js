@@ -14,13 +14,14 @@ export function ttlCache(producer, { ttl, failTtl = ttl } = {}) {
 			inflight = (async () => {
 				try {
 					const next = await producer();
+					if (next == null) throw new Error("empty result");
 					value = next;
 					refreshedAt = Date.now();
 					failedAt = 0;
 					return next;
 				} catch {
 					failedAt = Date.now();
-					return value;
+					return value; // stale beats blank
 				} finally {
 					inflight = null;
 				}
@@ -34,6 +35,22 @@ export function ttlCache(producer, { ttl, failTtl = ttl } = {}) {
 	};
 }
 
+// resolves with `fallback` when `ms` elapses first
 export function withDeadline(promise, ms, fallback) {
-	return Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(fallback), ms))]);
+	return guard(promise, ms, fallback, null);
+}
+
+// rejects when `ms` elapses first — use it when a stuck producer must not
+// wedge the cache's in-flight slot forever
+export function withTimeout(promise, ms, label = "timeout") {
+	return guard(promise, ms, null, new Error(label));
+}
+
+function guard(promise, ms, fallback, error) {
+	let timer;
+	const timeout = new Promise((resolve, reject) => {
+		timer = setTimeout(() => (error ? reject(error) : resolve(fallback)), ms);
+		timer.unref?.();
+	});
+	return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }

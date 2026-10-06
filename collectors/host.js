@@ -26,7 +26,7 @@ export async function collectHost() {
 }
 
 async function readDisk() {
-	const { stdout } = await execFileAsync("df", ["-k", "/"]);
+	const { stdout } = await execFileAsync("df", ["-k", "/"], { timeout: 3000 });
 	const line = stdout.trim().split("\n")[1];
 	const [, blocks, used, avail] = line.split(/\s+/);
 	const total = Number(blocks) * 1024;

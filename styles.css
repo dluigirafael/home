@@ -459,6 +459,10 @@ body::before {
     margin-top: .12rem;
 }
 
+.h-icon:not([src]) {
+    visibility: hidden;
+}
+
 .h-dot {
     width: 6px;
     height: 6px;

@@ -1,8 +1,8 @@
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
-import { PORT, WIDGET_TOKEN, STATS_TTL } from "./config.js";
-import { ttlCache } from "./cache.js";
+import { PORT, WIDGET_TOKEN, STATS_TTL, STATS_DEADLINE_MS } from "./config.js";
+import { ttlCache, withTimeout } from "./cache.js";
 import { gatherStats } from "./aggregates/stats.js";
 import { createRouter } from "./routes.js";
 
@@ -13,7 +13,11 @@ if (!WIDGET_TOKEN) {
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
-const stats = ttlCache(gatherStats, { ttl: STATS_TTL, failTtl: 30000 });
+// a collector that hangs must fail the refresh, not the in-flight slot
+const stats = ttlCache(() => withTimeout(gatherStats(), STATS_DEADLINE_MS * 2, "stats deadline"), {
+	ttl: STATS_TTL,
+	failTtl: 30000,
+});
 const route = createRouter({ rootDir, stats });
 
 const server = http.createServer((req, res) => {
