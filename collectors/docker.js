@@ -10,22 +10,21 @@ import {
 
 const containerMemCache = new Map();
 const appHistory = new Map();
-let lastMemoryRefresh = 0;
 
 export async function collectDocker() {
-	const list = await listContainers();
-	if (!list) return [];
+  const list = await listContainers();
+  if (!list) return [];
 
-	const groups = groupByProject(list);
-	const now = Date.now();
+  const groups = groupByProject(list);
+  const now = Date.now();
 
-	const entries = [];
-	for (const [project, g] of groups.entries()) {
-		if (HEALTH_EXCLUDE.has(project)) continue;
-		entries.push(await summarize(project, g, now));
-	}
+  const entries = await Promise.all(
+    [...groups.entries()]
+      .filter(([project]) => !HEALTH_EXCLUDE.has(project))
+      .map(([project, g]) => summarize(project, g, now))
+  );
 
-	return entries.sort((a, b) => a.name.localeCompare(b.name));
+  return entries.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 async function listContainers() {
@@ -71,52 +70,48 @@ function groupByProject(list) {
 }
 
 async function summarize(project, g, now) {
-	const mems = [];
-	for (const id of g.runningIds) {
-		mems.push(await containerMemoryMB(id));
-	}
-	const totalMemMB = Math.round(mems.reduce((a, b) => a + b, 0));
+  const mems = await Promise.all(g.runningIds.map(containerMemoryMB));
+  const totalMemMB = Math.round(mems.reduce((a, b) => a + b, 0));
 
-	const hist = appHistory.get(project) || [];
-	hist.push(totalMemMB);
-	if (hist.length > HISTORY_SIZE) hist.shift();
-	appHistory.set(project, hist);
+  const hist = appHistory.get(project) || [];
+  hist.push(totalMemMB);
+  if (hist.length > HISTORY_SIZE) hist.shift();
+  appHistory.set(project, hist);
 
-	const okCount = g.checks.filter(Boolean).length;
-	const total = g.checks.length;
-	const state = okCount === total ? "running" : okCount === 0 ? "stopped" : "partial";
+  const okCount = g.checks.filter(Boolean).length;
+  const total = g.checks.length;
+  const state = okCount === total ? 'running' : okCount === 0 ? 'stopped' : 'partial';
 
-	return {
-		name: project.replace(/^ix-/, ""),
-		state,
-		running: okCount,
-		total,
-		uptime: g.startedAt ? Math.floor((now - g.startedAt) / 1000) : null,
-		restarts: g.restarts,
-		memMB: totalMemMB,
-		memHistory: [...hist],
-	};
+  return {
+    name: project.replace(/^ix-/, ''),
+    state,
+    running: okCount,
+    total,
+    uptime: g.startedAt ? Math.floor((now - g.startedAt) / 1000) : null,
+    restarts: g.restarts,
+    memMB: totalMemMB,
+    memHistory: [...hist],
+  };
 }
 
 async function containerMemoryMB(id) {
-	const cached = containerMemCache.get(id);
-	const now = Date.now();
-	if (cached && now - cached.ts < MEMORY_REFRESH_MS) return cached.mb;
+  const cached = containerMemCache.get(id);
+  const now = Date.now();
+  if (cached && now - cached.ts < MEMORY_REFRESH_MS) return cached.mb;
 
-	try {
-		const r = await dockerRequest(`/containers/${id}/stats?stream=false`, MEMORY_TIMEOUT);
-		if (r.status !== 200) return cached?.mb ?? 0;
-		const s = JSON.parse(r.body);
-		const usage = s.memory_stats?.usage ?? 0;
-		const cache = s.memory_stats?.stats?.cache ?? s.memory_stats?.stats?.inactive_file ?? 0;
-		const mb = Math.max(0, usage - cache) / 1024 / 1024;
-		containerMemCache.set(id, { mb, ts: now });
-		return mb;
-	} catch {
-		return cached?.mb ?? 0;
-	}
+  try {
+    const r = await dockerRequest(`/containers/${id}/stats?stream=false`, MEMORY_TIMEOUT);
+    if (r.status !== 200) return cached?.mb ?? 0;
+    const s = JSON.parse(r.body);
+    const usage = s.memory_stats?.usage ?? 0;
+    const cache = s.memory_stats?.stats?.cache ?? s.memory_stats?.stats?.inactive_file ?? 0;
+    const mb = Math.max(0, usage - cache) / 1024 / 1024;
+    containerMemCache.set(id, { mb, ts: now });
+    return mb;
+  } catch {
+    return cached?.mb ?? 0;
+  }
 }
-
 function dockerRequest(path, timeout = DOCKER_TIMEOUT) {
 	return new Promise((resolve, reject) => {
 		const u = new URL(DOCKER_PROXY);
