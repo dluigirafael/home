@@ -1,7 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { MANAGER_URL, BOT_ID, MUSIC_CACHE_MS, WIDGET_TOKEN } from "./config.js";
-import { fetchIcon } from "./collectors/docker.js";
 
 const STATIC = {
 	"/": "index.html",
@@ -63,18 +62,7 @@ export function createRouter({ rootDir, stats }) {
 		if (cached) return json(res, 200, cached);
 		return json(res, 200, await stats.get());
 	}
-	async function serveIcon(res, slug) {
-		const icon = await fetchIcon(slug);
-		if (!icon || !icon.buf) {
-			res.writeHead(404).end();
-			return;
-		}
-		res.writeHead(200, {
-			"content-type": icon.contentType,
-			"cache-control": "public, max-age=86400",
-		});
-		res.end(icon.buf);
-	}
+
 
 	return async function route(req, res) {
 		if (req.method !== "GET") {
@@ -86,14 +74,7 @@ export function createRouter({ rootDir, stats }) {
 
 		if (STATIC[path]) return serveStatic(res, STATIC[path]);
 
-		if (path.startsWith("/icons/") && path.endsWith(".svg")) {
-			const file = path.slice(7);
-			if (!/^[a-z0-9-]+\.svg$/.test(file)) {
-				res.writeHead(400).end();
-				return;
-			}
-			return serveIcon(res, file.slice(0, -4));
-		}
+
 
 		if (path === "/data") return serveData(res);
 		if (path === "/stats") return serveStats(res);

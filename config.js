@@ -17,6 +17,7 @@ export const STATS_TTL = Number(process.env.STATS_TTL || 5000);
 export const STATS_DEADLINE_MS = Number(process.env.STATS_DEADLINE_MS || 5000);
 export const MEMORY_REFRESH_MS = Number(process.env.MEMORY_REFRESH_MS || 30000);
 export const HISTORY_SIZE = 60;
+export const MEMORY_TIMEOUT = Number(process.env.MEMORY_TIMEOUT || 15000);
 
 export const HEALTH_EXCLUDE = new Set(
 	(process.env.HEALTH_EXCLUDE || "")

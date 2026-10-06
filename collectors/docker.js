@@ -1,9 +1,14 @@
 import http from "node:http";
-import { DOCKER_PROXY, DOCKER_TIMEOUT, HEALTH_EXCLUDE, HISTORY_SIZE, MEMORY_REFRESH_MS } from "../config.js";
+import {
+	DOCKER_PROXY,
+	DOCKER_TIMEOUT,
+	HEALTH_EXCLUDE,
+	HISTORY_SIZE,
+	MEMORY_REFRESH_MS,
+	MEMORY_TIMEOUT,
+} from "../config.js";
 
-const ICON_CACHE = new Map();
-const ICON_TTL = 24 * 60 * 60 * 1000;
-
+const containerMemCache = new Map();
 const appHistory = new Map();
 let lastMemoryRefresh = 0;
 
@@ -13,14 +18,12 @@ export async function collectDocker() {
 
 	const groups = groupByProject(list);
 	const now = Date.now();
-	const memoryStale = now - lastMemoryRefresh > MEMORY_REFRESH_MS;
-	if (memoryStale) lastMemoryRefresh = now;
 
-	const entries = await Promise.all(
-		[...groups.entries()]
-			.filter(([project]) => !HEALTH_EXCLUDE.has(project))
-			.map(([project, g]) => summarize(project, g, memoryStale, now)),
-	);
+	const entries = [];
+	for (const [project, g] of groups.entries()) {
+		if (HEALTH_EXCLUDE.has(project)) continue;
+		entries.push(await summarize(project, g, now));
+	}
 
 	return entries.sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -67,16 +70,17 @@ function groupByProject(list) {
 	return groups;
 }
 
-async function summarize(project, g, memoryStale, now) {
-	const hist = appHistory.get(project) || [];
-
-	if (memoryStale) {
-		const mems = await Promise.all(g.runningIds.map(containerMemoryMB));
-		const total = Math.round(mems.reduce((a, b) => a + b, 0));
-		hist.push(total);
-		if (hist.length > HISTORY_SIZE) hist.shift();
-		appHistory.set(project, hist);
+async function summarize(project, g, now) {
+	const mems = [];
+	for (const id of g.runningIds) {
+		mems.push(await containerMemoryMB(id));
 	}
+	const totalMemMB = Math.round(mems.reduce((a, b) => a + b, 0));
+
+	const hist = appHistory.get(project) || [];
+	hist.push(totalMemMB);
+	if (hist.length > HISTORY_SIZE) hist.shift();
+	appHistory.set(project, hist);
 
 	const okCount = g.checks.filter(Boolean).length;
 	const total = g.checks.length;
@@ -89,21 +93,27 @@ async function summarize(project, g, memoryStale, now) {
 		total,
 		uptime: g.startedAt ? Math.floor((now - g.startedAt) / 1000) : null,
 		restarts: g.restarts,
-		memMB: hist.length ? hist[hist.length - 1] : 0,
+		memMB: totalMemMB,
 		memHistory: [...hist],
 	};
 }
 
 async function containerMemoryMB(id) {
+	const cached = containerMemCache.get(id);
+	const now = Date.now();
+	if (cached && now - cached.ts < MEMORY_REFRESH_MS) return cached.mb;
+
 	try {
-		const r = await dockerRequest(`/containers/${id}/stats?stream=false`, DOCKER_TIMEOUT);
-		if (r.status !== 200) return 0;
+		const r = await dockerRequest(`/containers/${id}/stats?stream=false`, MEMORY_TIMEOUT);
+		if (r.status !== 200) return cached?.mb ?? 0;
 		const s = JSON.parse(r.body);
 		const usage = s.memory_stats?.usage ?? 0;
 		const cache = s.memory_stats?.stats?.cache ?? s.memory_stats?.stats?.inactive_file ?? 0;
-		return Math.max(0, usage - cache) / 1024 / 1024;
+		const mb = Math.max(0, usage - cache) / 1024 / 1024;
+		containerMemCache.set(id, { mb, ts: now });
+		return mb;
 	} catch {
-		return 0;
+		return cached?.mb ?? 0;
 	}
 }
 
@@ -119,35 +129,4 @@ function dockerRequest(path, timeout = DOCKER_TIMEOUT) {
 		req.setTimeout(timeout, () => req.destroy(new Error("timeout")));
 		req.end();
 	});
-}
-
-export async function fetchIcon(slug) {
-	const cached = ICON_CACHE.get(slug);
-	if (cached && Date.now() - cached.ts < ICON_TTL) return cached;
-
-	const urls = [
-		`https://media.sys.truenas.net/apps/${slug}/icon/logo.svg`,
-		`https://media.sys.truenas.net/apps/${slug}/icon/logo.png`,
-	];
-
-	for (const url of urls) {
-		try {
-			const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
-			if (!r.ok) continue;
-
-			const buf = Buffer.from(await r.arrayBuffer());
-			const entry = {
-				buf,
-				contentType: r.headers.get("content-type") || "image/svg+xml",
-				ts: Date.now(),
-			};
-			ICON_CACHE.set(slug, entry);
-			return entry;
-		} catch {
-			// try next
-		}
-	}
-
-	ICON_CACHE.set(slug, { buf: null, ts: Date.now() });
-	return null;
 }
