@@ -8,7 +8,7 @@ import {
 } from "../config.js";
 
 const containerStatsCache = new Map();
-
+const appCpuHistory = new Map();
 const appHistory = new Map();
 
 export async function collectDocker() {
