@@ -1,18 +1,16 @@
-FROM node:alpine
+FROM denoland/deno:2.1.4 AS build
 WORKDIR /app
-
-ARG GIT_SHA=unknown
-ARG BUILD_DATE=unknown
-ARG GH_RUN_URL=
-
-ENV GIT_SHA=$GIT_SHA
-ENV BUILD_DATE=$BUILD_DATE
-ENV GH_RUN_URL=$GH_RUN_URL
-
+COPY deno.json package.json ./
+RUN deno install
 COPY . .
+RUN deno task build
 
-RUN addgroup -S app && adduser -S app -G app && chown -R app:app /app
-USER app
-
+FROM denoland/deno:2.1.4
+WORKDIR /app
+COPY --from=build /app/_fresh ./_fresh
+COPY --from=build /app/deno.json .
+ENV DENO_DEPLOYMENT_ID=${GIT_SHA:-dev}
+ENV PORT=3000
 EXPOSE 3000
-CMD ["node", "server.js"]
+USER deno
+CMD ["run", "-A", "--allow-read=/sys,/proc,/var/run/docker.sock", "--allow-net", "--allow-run", "_fresh/server.js"]
