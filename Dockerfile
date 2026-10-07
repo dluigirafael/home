@@ -12,4 +12,4 @@ COPY --from=build /app/deno.json .
 COPY --from=build /app/deno.lock* ./
 ENV PORT=3000
 EXPOSE 3000
-CMD ["run", "--allow-read=/sys,/proc,/app,/tmp", "--allow-net", "--allow-env", "--allow-sys", "--allow-write=/tmp", "--allow-run=df", "_fresh/server.js"]
+CMD ["serve", "-A", "_fresh/server.js"]
