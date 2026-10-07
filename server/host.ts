@@ -62,10 +62,32 @@ async function readCPU(): Promise<CPUInfo> {
   };
 }
 
-function readMem(): MemInfo {
+async function readMem(): Promise<MemInfo> {
   const m = Deno.systemMemoryInfo();
-  const used = m.total - m.available;
-  return { total: m.total, used, free: m.available, percent: (used / m.total) * 100 };
+  let arc = 0;
+  try {
+    const text = await Deno.readTextFile("/proc/spl/kstat/zfs/arcstats");
+    for (const line of text.split("\n")) {
+      const parts = line.trim().split(/\s+/);
+      if (parts[0] === "size") {
+        arc = Number(parts[2]) || 0;
+        break;
+      }
+    }
+  } catch {
+  }
+
+  const used = Math.max(
+    0,
+    m.total - m.free - (m.buffers ?? 0) - (m.cached ?? 0) - arc,
+  );
+
+  return {
+    total: m.total,
+    used,
+    free: m.total - used,
+    percent: m.total > 0 ? (used / m.total) * 100 : 0,
+  };
 }
 
 async function readDisk(): Promise<DiskInfo> {
