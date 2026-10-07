@@ -7,7 +7,7 @@ interface Props {
   color?: string;
 }
 
-export default function Sparkline({
+export function Sparkline({
   values,
   width = 100,
   height = 16,

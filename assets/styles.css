@@ -116,11 +116,11 @@ body::before {
     color: var(--muted);
 }
 
-.server-status[data-state="ok"] {
+.server-status.ok {
     color: var(--ok);
 }
 
-.server-status[data-state="bad"] {
+.server-status.bad {
     color: var(--bad);
 }
 
@@ -141,12 +141,12 @@ body::before {
     transition: background .2s, box-shadow .2s;
 }
 
-.dot[data-state="playing"] {
+.dot.playing {
     background: var(--ok);
     box-shadow: 0 0 10px rgba(74, 222, 128, .4);
 }
 
-.dot[data-state="paused"] {
+.dot.paused {
     background: var(--warn);
 }
 
@@ -226,7 +226,7 @@ body::before {
 
 /* ─── queue ─── */
 
-#queue {
+.queue-wrap {
     padding: 0 2rem;
 }
 
@@ -285,10 +285,6 @@ body::before {
     min-width: 1.1rem;
     padding-top: .2rem;
     font-variant-numeric: tabular-nums;
-}
-
-.queue-wrap {
-    padding: 0 2rem;
 }
 
 .q-meta {
@@ -378,19 +374,19 @@ body::before {
     opacity: .7;
 }
 
-.resources .cell[data-level="warn"] .v {
+.resources .cell.warn .v {
     color: var(--warn);
 }
 
-.resources .cell[data-level="warn"] .spark-svg polyline {
+.resources .cell.warn .spark-svg polyline {
     stroke: var(--warn);
 }
 
-.resources .cell[data-level="hot"] .v {
+.resources .cell.hot .v {
     color: var(--bad);
 }
 
-.resources .cell[data-level="hot"] .spark-svg polyline {
+.resources .cell.hot .spark-svg polyline {
     stroke: var(--bad);
 }
 
@@ -432,11 +428,11 @@ body::before {
     text-overflow: ellipsis;
 }
 
-.meta .cell[data-level="warn"] .v {
+.meta .cell.warn .v {
     color: var(--warn);
 }
 
-.meta .cell[data-level="hot"] .v {
+.meta .cell.hot .v {
     color: var(--bad);
 }
 
@@ -467,6 +463,12 @@ body::before {
     gap: .55rem 1rem;
 }
 
+.health-error {
+    font-size: .78rem;
+    color: var(--dim);
+    font-style: italic;
+}
+
 .h-item {
     display: flex;
     align-items: flex-start;
@@ -475,12 +477,14 @@ body::before {
 }
 
 .h-icon {
-    width: 18px;
-    height: 18px;
+    width: 22px;
+    height: 22px;
     flex-shrink: 0;
-    margin-top: .12rem;
+    margin-top: .08rem;
     object-fit: contain;
-    filter: grayscale(.35);
+    padding: 3px;
+    background: rgba(255, 255, 255, .09);
+    border-radius: 5px;
 }
 
 .h-dot {
@@ -540,8 +544,6 @@ body::before {
 .h-sub .bad {
     color: var(--bad);
 }
-
-
 
 /* ─── build footer ─── */
 
@@ -609,7 +611,7 @@ body::before {
         margin-bottom: 1rem;
     }
 
-    #queue {
+    .queue-wrap {
         padding: 0 1.25rem;
     }
 

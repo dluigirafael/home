@@ -8,9 +8,7 @@ export const handler = define.handlers({
   async GET() {
     const now = Date.now();
     if (cache.body && now - cache.ts < CONFIG.musicCacheMs) {
-      return new Response(cache.body, {
-        headers: { "content-type": "application/json" },
-      });
+      return new Response(cache.body, { headers: { "content-type": "application/json" } });
     }
 
     const url = `${CONFIG.managerUrl}/api/widget/player/${CONFIG.botId}/data?token=${encodeURIComponent(CONFIG.widgetToken)}`;
@@ -22,9 +20,7 @@ export const handler = define.handlers({
         return Response.json({ error: "upstream", status: res.status }, { status: 502 });
       }
       cache = { body, ts: now };
-      return new Response(body, {
-        headers: { "content-type": "application/json" },
-      });
+      return new Response(body, { headers: { "content-type": "application/json" } });
     } catch (e) {
       return Response.json(
         { error: "unreachable", message: (e as Error).message },

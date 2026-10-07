@@ -1,12 +1,10 @@
-export default function Build({
-  sha,
-  date,
-  runUrl,
-}: {
+interface Props {
   sha: string | null;
   date: string | null;
   runUrl: string | null;
-}) {
+}
+
+export default function Build({ sha, date, runUrl }: Props) {
   const hasSha = !!sha;
   const d = date ? new Date(date) : null;
   const hasDate = !!d && !isNaN(d.getTime());
