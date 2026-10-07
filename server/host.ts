@@ -23,22 +23,22 @@ const PROCESS_START = Date.now();
 let prev: { total: number; idle: number; ts: number } | null = null;
 
 export async function collectHost(): Promise<HostStats> {
-  const [cpu, disk, temps] = await Promise.all([
+  const [cpu, mem, disk, temps] = await Promise.all([
     readCPU(),
+    readMem(),
     readDisk().catch(() => null),
     readTemps().catch(() => []),
   ]);
 
   return {
     cpu,
-    mem: readMem(),
+    mem,
     disk,
     temps,
     uptime: { host: Deno.osUptime(), process: (Date.now() - PROCESS_START) / 1000 },
     clock: readClock(),
   };
 }
-
 async function readCPU(): Promise<CPUInfo> {
   const line = (await Deno.readTextFile("/proc/stat")).split("\n")[0];
   const parts = line.split(/\s+/).slice(1).map(Number);
@@ -64,6 +64,7 @@ async function readCPU(): Promise<CPUInfo> {
 
 async function readMem(): Promise<MemInfo> {
   const m = Deno.systemMemoryInfo();
+
   let arc = 0;
   try {
     const text = await Deno.readTextFile("/proc/spl/kstat/zfs/arcstats");
@@ -75,12 +76,10 @@ async function readMem(): Promise<MemInfo> {
       }
     }
   } catch {
+    // Not ZFS — arc stays 0
   }
 
-  const used = Math.max(
-    0,
-    m.total - m.free - (m.buffers ?? 0) - (m.cached ?? 0) - arc,
-  );
+  const used = Math.max(0, m.total - m.free - arc);
 
   return {
     total: m.total,
