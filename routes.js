@@ -23,14 +23,14 @@ export function createRouter({ rootDir, stats }) {
 		res.end(typeof body === "string" ? body : JSON.stringify(body));
 	}
 
-	async function serveStatic(req, res, file) {
+	async function serveStatic(req, res, entry) {
 		try {
-			const path = join(rootDir, file);
+			const path = join(rootDir, entry.file);
 			const [body, info] = await Promise.all([readFile(path), stat(path)]);
 			const etag = `"${info.mtimeMs.toString(16)}-${info.size.toString(16)}"`;
 			const headers = {
-				"content-type": TYPES[file.slice(file.lastIndexOf(".") + 1)] || "application/octet-stream",
-				"cache-control": STATIC[req.url.split("?")[0]].cache,
+				"content-type": TYPES[entry.file.slice(entry.file.lastIndexOf(".") + 1)] || "application/octet-stream",
+				"cache-control": entry.cache,
 				etag,
 			};
 
@@ -84,7 +84,7 @@ export function createRouter({ rootDir, stats }) {
 		const path = new URL(req.url, "http://x").pathname;
 		const entry = STATIC[path];
 
-		if (entry) return serveStatic(req, res, entry.file);
+		if (entry) return serveStatic(req, res, entry);
 		if (path === "/data") return serveData(res);
 		if (path === "/stats") return serveStats(res);
 

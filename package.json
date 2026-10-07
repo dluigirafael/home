@@ -12,6 +12,6 @@
 	"type": "module",
 	"scripts": {
 		"start": "node server.js",
-		"dev": "node --env-file=.env  --watch server.js"
+		"dev": "node --env-file=.env --watch server.js"
 	}
 }

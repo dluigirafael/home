@@ -1,7 +1,7 @@
 import http from "node:http";
 import { TS_HOST, TS_PORT, TS_API_KEY, TS_BOT_GROUP, TS_TIMEOUT } from "../config.js";
 
-const OFFLINE = { online: false, clients: null, maxClients: null };
+export const OFFLINE = { online: false, clients: null, maxClients: null };
 
 function request(path) {
 	return new Promise((resolve, reject) => {

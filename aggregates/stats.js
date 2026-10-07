@@ -1,11 +1,10 @@
-import { collectTs } from "../collectors/ts.js";
+import { collectTs, OFFLINE } from "../collectors/ts.js";
 import { collectHost } from "../collectors/host.js";
 import { collectDocker } from "../collectors/docker.js";
 import { withDeadline } from "../cache.js";
 import { HISTORY_SIZE, STATS_DEADLINE_MS } from "../config.js";
 
 const history = { cpu: [], ram: [], disk: [] };
-const OFFLINE = { online: false, clients: null, maxClients: null };
 
 export async function gatherStats() {
 	const [ts, host, containers] = await Promise.all([
