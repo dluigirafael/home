@@ -156,21 +156,20 @@ async function poll() {
 	renderQueue(d.upcoming, d.queueLength);
 }
 
-function sparkline(el, values, w, h, stroke) {
+function sparkline(el, values, w, h, stroke, maxOverride = null) {
 	if (!el) return;
 	if (!values || values.length < 2) {
 		el.replaceChildren();
 		return;
 	}
-	const max = Math.max(...values, 1);
+	const max = maxOverride ?? Math.max(...values, 1);
 	const step = w / (values.length - 1);
-	const pts = values.map((v, i) => `${(i * step).toFixed(1)},${(h - (v / max) * h).toFixed(1)}`).join(" ");
+	const pts = values.map((v, i) => `${(i * step).toFixed(1)},${(h - Math.min(h, (v / max) * h)).toFixed(1)}`).join(" ");
 	const html = `<svg class="spark-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
     <polyline points="${pts}" fill="none" stroke="#8a8d94" stroke-width="${stroke}" vector-effect="non-scaling-stroke"/>
   </svg>`;
 	if (el.innerHTML !== html) el.innerHTML = html;
 }
-
 function setMetric(id, value) {
 	text($(id), value);
 }
@@ -207,7 +206,7 @@ function updateRow(row, c) {
 	const restarts = row.querySelector('[data-k="restarts"]');
 	text(restarts, c.restarts ? `↻ ${c.restarts}` : "");
 	attr(restarts, "data-state", c.restarts > 5 ? "bad" : "");
-	sparkline(row.querySelector(".h-graph"), c.memHistory, 60, 12, 1.2);
+	sparkline(row.querySelector(".h-graph"), c.cpuHistory, 60, 12, 1.2, 100);
 }
 
 function renderHealth(containers) {

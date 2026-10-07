@@ -70,74 +70,74 @@ function groupByProject(list) {
 }
 
 async function summarize(project, g, now) {
-  const results = await Promise.all(g.runningIds.map(containerStats));
+	const results = await Promise.all(g.runningIds.map(containerStats));
 
-  const totalMemMB = Math.round(results.reduce((a, r) => a + r.memMB, 0));
-  const cpuPct = Math.round(results.reduce((a, r) => a + r.cpuPct, 0) * 10) / 10;
+	const totalMemMB = Math.round(results.reduce((a, r) => a + r.memMB, 0));
+	const cpuPct = Math.round(results.reduce((a, r) => a + r.cpuPct, 0) * 10) / 10;
 
-  const cpuHist = appCpuHistory.get(project) || [];
-  cpuHist.push(cpuPct);
-  if (cpuHist.length > HISTORY_SIZE) cpuHist.shift();
-  appCpuHistory.set(project, cpuHist);
+	const cpuHist = appCpuHistory.get(project) || [];
+	cpuHist.push(cpuPct);
+	if (cpuHist.length > HISTORY_SIZE) cpuHist.shift();
+	appCpuHistory.set(project, cpuHist);
 
-  const memHist = appHistory.get(project) || [];
-  memHist.push(totalMemMB);
-  if (memHist.length > HISTORY_SIZE) memHist.shift();
-  appHistory.set(project, memHist);
+	const memHist = appHistory.get(project) || [];
+	memHist.push(totalMemMB);
+	if (memHist.length > HISTORY_SIZE) memHist.shift();
+	appHistory.set(project, memHist);
 
-  const okCount = g.checks.filter(Boolean).length;
-  const total = g.checks.length;
-  const state = okCount === total ? 'running' : okCount === 0 ? 'stopped' : 'partial';
+	const okCount = g.checks.filter(Boolean).length;
+	const total = g.checks.length;
+	const state = okCount === total ? "running" : okCount === 0 ? "stopped" : "partial";
 
-  return {
-    name: project.replace(/^ix-/, ''),
-    state,
-    running: okCount,
-    total,
-    uptime: g.startedAt ? Math.floor((now - g.startedAt) / 1000) : null,
-    restarts: g.restarts,
-    memMB: totalMemMB,
-    cpuPct,
-    cpuHistory: [...cpuHist],
-    memHistory: [...memHist],
-  };
+	return {
+		name: project.replace(/^ix-/, ""),
+		state,
+		running: okCount,
+		total,
+		uptime: g.startedAt ? Math.floor((now - g.startedAt) / 1000) : null,
+		restarts: g.restarts,
+		memMB: totalMemMB,
+		cpuPct,
+		cpuHistory: [...cpuHist],
+		memHistory: [...memHist],
+	};
 }
 const containerStats = async (id) => {
-  const prev = containerStatsCache.get(id);
-  const now = Date.now();
+	const prev = containerStatsCache.get(id);
+	const now = Date.now();
 
-  if (prev && now - prev.ts < MEMORY_REFRESH_MS) {
-    return { memMB: prev.memMB, cpuPct: prev.cpuPct };
-  }
+	if (prev && now - prev.ts < MEMORY_REFRESH_MS) {
+		return { memMB: prev.memMB, cpuPct: prev.cpuPct };
+	}
 
-  try {
-    const r = await dockerRequest(`/containers/${id}/stats?stream=false`, MEMORY_TIMEOUT);
-    if (r.status !== 200) {
-      return { memMB: prev?.memMB ?? 0, cpuPct: prev?.cpuPct ?? 0 };
-    }
-    const s = JSON.parse(r.body);
+	try {
+		const r = await dockerRequest(`/containers/${id}/stats?stream=false`, MEMORY_TIMEOUT);
+		if (r.status !== 200) {
+			return { memMB: prev?.memMB ?? 0, cpuPct: prev?.cpuPct ?? 0 };
+		}
+		const s = JSON.parse(r.body);
 
-    const usage = s.memory_stats?.usage ?? 0;
-    const cache = s.memory_stats?.stats?.cache ?? s.memory_stats?.stats?.inactive_file ?? 0;
-    const memMB = Math.max(0, usage - cache) / 1024 / 1024;
+		const usage = s.memory_stats?.usage ?? 0;
+		const cache = s.memory_stats?.stats?.cache ?? s.memory_stats?.stats?.inactive_file ?? 0;
+		const memMB = Math.max(0, usage - cache) / 1024 / 1024;
 
-    const cpu = s.cpu_stats || {};
-    const total = cpu.cpu_usage?.total_usage ?? 0;
-    const system = cpu.system_cpu_usage ?? 0;
-    const cpus = cpu.online_cpus ?? cpu.cpu_usage?.percpu_usage?.length ?? 1;
+		const cpu = s.cpu_stats || {};
+		const total = cpu.cpu_usage?.total_usage ?? 0;
+		const system = cpu.system_cpu_usage ?? 0;
+		const cpus = cpu.online_cpus ?? cpu.cpu_usage?.percpu_usage?.length ?? 1;
 
-    let cpuPct = 0;
-    if (prev) {
-      const dc = total - prev.total;
-      const ds = system - prev.system;
-      if (ds > 0 && dc >= 0) cpuPct = (dc / ds) * cpus * 100;
-    }
+		let cpuPct = 0;
+		if (prev) {
+			const dc = total - prev.total;
+			const ds = system - prev.system;
+			if (ds > 0 && dc >= 0) cpuPct = (dc / ds) * cpus * 100;
+		}
 
-    containerStatsCache.set(id, { memMB, cpuPct, total, system, cpus, ts: now });
-    return { memMB, cpuPct };
-  } catch {
-    return { memMB: prev?.memMB ?? 0, cpuPct: prev?.cpuPct ?? 0 };
-  }
+		containerStatsCache.set(id, { memMB, cpuPct, total, system, cpus, ts: now });
+		return { memMB, cpuPct };
+	} catch {
+		return { memMB: prev?.memMB ?? 0, cpuPct: prev?.cpuPct ?? 0 };
+	}
 };
 async function dockerRequest(path, timeout = DOCKER_TIMEOUT) {
 	const res = await fetch(new URL(path, DOCKER_PROXY), { signal: AbortSignal.timeout(timeout) });
